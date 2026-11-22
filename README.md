@@ -8,34 +8,33 @@ Homie ist für das Heimnetz gedacht. Bitte nicht ins Internet freigeben.
 
 ## Installation in drei Schritten
 
-Du brauchst einen Linux-Rechner mit Docker (ein Mini-PC, eine VM, ein NAS). Homie kommt als fertiges Image; gebaut werden muss nichts.
+Du brauchst einen Linux-Rechner mit Docker (ein Mini-PC, eine VM, ein NAS). Homie kommt als fertiges, öffentliches Image – gebaut werden muss nichts, und ein Token braucht es dafür nicht.
 
 ### Weg A: mit Portainer
 
-1. **Stack anlegen:** Portainer → *Stacks* → *Add stack* → *Repository*.
-   Repository-URL `https://github.com/joshlukas/homie`, Compose-Pfad `docker-compose.yml` (ist schon vorausgefüllt).
-2. **Starten:** *Deploy the stack*. Portainer lädt das fertige Image und startet Homie.
+1. **Stack anlegen:** Portainer → *Stacks* → *Add stack* → *Web editor*, Name `homie`. Den Inhalt von [docker-compose.yml](docker-compose.yml) hineinkopieren.
+2. **Starten:** *Deploy the stack*. Portainer lädt das Image und startet Homie.
 3. **Öffnen:** `http://<Adresse-des-Rechners>:8090` im Browser aufrufen und dein Passwort anlegen. Alles Weitere geschieht im Tab *Onboarding*.
 
 ### Weg B: ohne Portainer
 
-1. **Holen:** `git clone https://github.com/joshlukas/homie.git && cd homie`
-2. **Starten:** `docker compose up -d`
+1. **Holen:** `docker-compose.yml` in einen leeren Ordner auf dem Rechner legen.
+2. **Starten:** in diesem Ordner `docker compose up -d`
 3. **Öffnen:** `http://<Adresse-des-Rechners>:8090` aufrufen und dein Passwort anlegen.
 
 Lege das Passwort gleich nach dem Start an: Bis dahin könnte es jeder in deinem Heimnetz tun.
 
-## Solange Repository und Image privat sind
+## Was öffentlich ist und was nicht
 
-Dann braucht der Abruf einen GitHub-Zugang, den **du selbst** einträgst – nie in einen Chat, nie in eine Datei im Repository:
+| | Sichtbarkeit | Inhalt |
+|---|---|---|
+| Image `ghcr.io/joshlukas/homie` | öffentlich | nur das Programm – keine Daten, keine Schlüssel, keine Adressen |
+| Dieses Repository | privat | Quelltext und seine Geschichte |
+| Datenordner der Installation | nur auf deinem Rechner | alles Persönliche |
 
-- Auf GitHub: *Settings → Developer settings → Personal access tokens → Tokens (classic) → Generate new token* mit den Rechten `repo` (Repository lesen) und `read:packages` (Image laden).
-- **Portainer:** unter *Registries* einmal `ghcr.io` mit Benutzername und Token hinterlegen; beim Stack *Authentication* einschalten und dieselben Angaben eintragen.
-- **Ohne Portainer:** einmal `docker login ghcr.io` ausführen; `git clone` fragt selbst nach Benutzername und Token.
+**Woher kommt das Image?** GitHub baut es bei jeder Änderung automatisch aus diesem Quelltext ([.github/workflows/image.yml](.github/workflows/image.yml)). Vorher laufen die Tests und die Privat-Prüfung: Steht im Repository eine Heimnetz-Adresse, ein Schlüssel oder eine E-Mail-Adresse, wird nichts gebaut und nichts veröffentlicht.
 
-Sind Repository und Image öffentlich, entfällt das alles.
-
-**Woher kommt das Image?** GitHub baut es bei jeder Änderung automatisch aus genau diesem Quelltext ([.github/workflows/image.yml](.github/workflows/image.yml)), nach bestandenen Tests, und legt es als `ghcr.io/joshlukas/homie:latest` ab. Lässt sich das Image nicht laden, baut der Stack Homie ersatzweise auf deinem Rechner aus dem Repository – dann reicht der Lesezugriff auf das Repository.
+**Stack direkt aus dem Repository (optional):** In Portainer geht statt *Web editor* auch *Repository* (`https://github.com/joshlukas/homie`). Weil das Repository privat ist, braucht das ein GitHub-Token mit Lesezugriff auf dieses Repository (*Fine-grained token*, *Contents: Read-only*), das **du selbst** unter *Authentication* einträgst – nie in einen Chat. Dasselbe gilt für `git clone`. Dafür lässt sich Homie dann auch ohne das Image vor Ort bauen.
 
 ## Was wo liegt
 
@@ -59,7 +58,7 @@ Jedes Modul erklärt in [homie/module.py](homie/module.py), welchen Dienst und w
 
 ## Alltag
 
-- **Aktualisieren:** Portainer → Stack → *Pull and redeploy* (mit *Re-pull image*). Ohne Portainer: `git pull && docker compose pull && docker compose up -d`.
+- **Aktualisieren:** Portainer → Stack → *Pull and redeploy* (mit *Re-pull image*). Ohne Portainer: `docker compose pull && docker compose up -d`.
 - **Passwort vergessen:** `docker exec homie python -m homie passwort-zuruecksetzen` – danach legst du im Browser ein neues an. Daten und Schlüssel bleiben.
 - **Entfernen:** Stack löschen. Das Volume `homie-daten` bleibt, bis du es ausdrücklich löschst.
 

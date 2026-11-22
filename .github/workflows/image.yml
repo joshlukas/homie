@@ -17,6 +17,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Das Image ist öffentlich: Findet die Prüfung Heimnetz-Adressen, Schlüssel oder
+      # E-Mail-Adressen im Repository, wird nichts gebaut und nichts veröffentlicht.
+      - name: Nichts Privates im Repository?
+        run: bash scripts/privat-pruefung.sh
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
