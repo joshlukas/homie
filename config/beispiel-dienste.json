@@ -3,7 +3,7 @@
   "dienste": [
     {
       "art": "homeassistant", "name": "Home Assistant", "adresse": "http://192.0.2.20:8123", "zustand": "gefunden", "farbe": "#3ddc97",
-      "details": {"beschreibung": "Smart-Home-Zentrale", "braucht": "ein Zugriffstoken (langlebig)", "schaltet_frei": "Gesundheit"}
+      "details": {"beschreibung": "Smart-Home-Zentrale", "braucht": "ein Zugriffstoken (langlebig)", "schaltet_frei": "Mein Tag, Gesundheit"}
     },
     {
       "art": "dokumente", "name": "Paperless-ngx", "adresse": "http://192.0.2.30:8000", "zustand": "verbunden", "farbe": "#5b9dff",

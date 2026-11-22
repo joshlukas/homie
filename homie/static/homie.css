@@ -209,3 +209,32 @@ details.container > summary { cursor: pointer; color: var(--muted); font-size: 1
 details.hand > form { margin-top: 8px; max-width: 560px; }
 details.hand form button { margin-top: 16px; }
 @media (max-width: 640px) { .raster.belege { grid-template-columns: 1fr; } }
+
+/* ---------- Etappe 2: Mein Tag ---------- */
+.spalten { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 0 22px; align-items: start; }
+.tagkarte { padding: 16px 18px 10px; margin-bottom: 12px; -webkit-backdrop-filter: none; backdrop-filter: none;
+  background: linear-gradient(155deg, rgba(52, 56, 104, 0.72) 0%, rgba(32, 35, 70, 0.78) 45%, rgba(28, 31, 62, 0.82) 100%); }
+.tagkarte.heute { border-color: rgba(255, 95, 162, 0.5); }
+.tagkarte h3 { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.termine, .aufgaben { list-style: none; margin: 8px 0 0; padding: 0; }
+.termine li, .aufgaben li { display: flex; gap: 12px; padding: 9px 0; border-top: 1px solid rgba(150, 160, 255, 0.12); }
+.termine time { flex: none; width: 92px; color: var(--muted); font-size: 13.5px; font-variant-numeric: tabular-nums; padding-top: 1px; }
+.termine div { min-width: 0; }
+.termine b { display: block; font-weight: 600; overflow-wrap: anywhere; }
+.termine small { margin-top: 2px; }
+.termine .vorbei { opacity: 0.5; }
+.aufgaben li { align-items: baseline; }
+.aufgaben i { flex: none; width: 12px; height: 12px; border-radius: 4px; border: 1.5px solid var(--faint); transform: translateY(1px); }
+.aufgaben span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.aufgaben small { margin: 0; flex: none; }
+.aufgaben small.spaet { color: var(--bad); }
+@media (max-width: 760px) { .spalten { grid-template-columns: 1fr; } }
+
+/* ---------- Etappe 2: Gesundheit ---------- */
+.kachel b small { display: inline; font-size: 14px; font-weight: 500; color: var(--muted); }
+.wochen { list-style: none; margin: 4px 0 0; padding: 0; }
+.wochen li { display: grid; grid-template-columns: 26px 1fr 64px; align-items: center; gap: 10px; padding: 5px 0; font-size: 13.5px; color: var(--muted); }
+.wochen .balken { margin: 0; }
+.wochen .balken i { min-width: 0; }
+.wochen b { text-align: right; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.wochen .heute span { color: var(--text); font-weight: 600; }

@@ -11,7 +11,7 @@ import aiohttp
 import jinja2
 from aiohttp import web
 
-from . import dokumente, katalog, module, verbinden
+from . import dokumente, gesundheit, katalog, module, tag, verbinden
 from .ablage import Ablage
 from .anmeldung import COOKIE, MIN_LAENGE, Anmeldung, passwort_maengel
 from .config import PAKET, VERSION, Einstellungen
@@ -289,6 +289,26 @@ async def _seite_dokumente(request: web.Request, modul: module.Modul) -> web.Res
     return _seite(request, "dokumente.html", status=200 if daten else 502, modul=modul, suche=suche, daten=daten, fehler=fehler)
 
 
+async def _seite_tag(request: web.Request, modul: module.Modul) -> web.Response:
+    zugang = _zugang(request.app, "homeassistant", ("token",))
+    daten, fehler = None, ""
+    try:
+        daten = await tag.uebersicht(zugang[0], zugang[1]["token"])
+    except tag.TagFehler as e:
+        fehler = str(e)
+    return _seite(request, "tag.html", status=200 if daten else 502, modul=modul, daten=daten, fehler=fehler)
+
+
+async def _seite_gesundheit(request: web.Request, modul: module.Modul) -> web.Response:
+    zugang = _zugang(request.app, "homeassistant", ("token",))
+    daten, fehler = None, ""
+    try:
+        daten = await gesundheit.uebersicht(zugang[0], zugang[1]["token"])
+    except gesundheit.GesundheitFehler as e:
+        fehler = str(e)
+    return _seite(request, "gesundheit.html", status=200 if daten else 502, modul=modul, daten=daten, fehler=fehler)
+
+
 async def dokument_vorschau(request: web.Request) -> web.Response:
     aktiv = any(s.aktiv and s.modul.id == "dokumente" for s in module.stand(request.app[K_DB], request.app[K_ABLAGE]))
     zugang = _zugang(request.app, "dokumente", ("token",)) if aktiv else None
@@ -374,6 +394,10 @@ async def modulseite(request: web.Request) -> web.Response:
                 return _seite(request, "netzplan.html", modul=s.modul, **_netzplan(request.app))
             if kennung == "dokumente":
                 return await _seite_dokumente(request, s.modul)
+            if kennung == "tag":
+                return await _seite_tag(request, s.modul)
+            if kennung == "gesundheit":
+                return await _seite_gesundheit(request, s.modul)
             return _seite(request, "modul.html", modul=s.modul)
     raise web.HTTPNotFound(text="Dieses Modul ist nicht aktiv.")
 

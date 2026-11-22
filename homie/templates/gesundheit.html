@@ -1,0 +1,38 @@
+{% extends "basis.html" %}
+{% block titel %}Homie – Gesundheit{% endblock %}
+{% block inhalt %}
+<section class="kopf">
+  <h1>Gesundheit</h1>
+  <p class="leiser">Was dein Handy über die Home-Assistant-App meldet. Homie liest nur und speichert nichts davon.</p>
+</section>
+{% if fehler %}
+<div class="glas leer"><h3>Gerade keine Werte</h3><p class="meldung" role="alert">{{ fehler }}</p></div>
+{% elif not daten.werte %}
+<div class="glas leer">
+  <h3>Noch keine Gesundheitswerte</h3>
+  <p class="leiser">Home Assistant kennt bisher keine Sensoren wie Schritte, Puls oder Schlaf. Schalte sie in der Home-Assistant-App auf deinem Handy ein (Einstellungen → Begleit-App → Sensoren verwalten → Health Connect), dann erscheinen sie hier.</p>
+</div>
+{% else %}
+<div class="kacheln">
+  {% for w in daten.werte %}
+  <div class="glas kachel"><b>{{ w.wert }}{% if w.einheit %} <small>{{ w.einheit }}</small>{% endif %}</b><span>{{ w.titel }}{% if w.stand %} · {{ w.stand }}{% endif %}</span></div>
+  {% endfor %}
+</div>
+
+{% if daten.verlauf %}
+<h2 class="gruppe"><span>Verlauf · {{ daten.tage }} Tage</span></h2>
+<div class="raster">
+  {% for v in daten.verlauf %}
+  <article class="glas karte">
+    <header><h3>{{ v.titel }}</h3><span class="chip">Ø {{ v.schnitt }}{% if v.einheit %} {{ v.einheit }}{% endif %}</span></header>
+    <ul class="wochen">
+      {% for t in v.tage %}
+      <li{% if t.heute %} class="heute"{% endif %}><span>{{ t.name }}</span><div class="balken"><i style="width: {{ t.anteil }}%"></i></div><b>{{ t.wert }}</b></li>
+      {% endfor %}
+    </ul>
+  </article>
+  {% endfor %}
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}

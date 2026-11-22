@@ -2,6 +2,7 @@
 
 Es wird nur 127.0.0.1 abgefragt; kein echtes Netz, keine echten Dienste.
 """
+import datetime as dt
 import ipaddress
 import secrets
 import tempfile
@@ -21,7 +22,10 @@ GUT = secrets.token_urlsafe(16)
 def _dienst(antworten: dict) -> web.Application:
     app = web.Application()
     for pfad, antwort in antworten.items():
-        app.router.add_get(pfad, antwort)
+        if pfad.startswith("POST "):
+            app.router.add_post(pfad[5:], antwort)
+        else:
+            app.router.add_get(pfad, antwort)
     return app
 
 
@@ -32,6 +36,47 @@ async def _ha_start(request):
 async def _ha_api(request):
     gut = request.headers.get("Authorization") == f"Bearer {GUT}"
     return web.json_response({"message": "API running."} if gut else {"message": "nein"}, status=200 if gut else 401)
+
+
+def _ha(antwort):
+    async def f(request):
+        if request.headers.get("Authorization") != f"Bearer {GUT}":
+            return web.json_response({"message": "nein"}, status=401)
+        return web.json_response(antwort(request))
+    return f
+
+
+def _ha_termine(request):
+    heute = dt.datetime.fromisoformat(request.query["start"])
+    return [
+        {"summary": "Zahnarzt", "location": "Praxis am Markt", "start": {"dateTime": (heute + dt.timedelta(hours=23, minutes=30)).isoformat()},
+         "end": {"dateTime": (heute + dt.timedelta(hours=23, minutes=50)).isoformat()}},
+        {"summary": "Geburtstag Oma", "start": {"date": (heute + dt.timedelta(days=1)).date().isoformat()}, "end": {"date": (heute + dt.timedelta(days=2)).date().isoformat()}},
+    ]
+
+
+HA = {
+    "/": _ha_start, "/api/": _ha_api,
+    "/api/calendars": _ha(lambda r: [{"entity_id": "calendar.privat", "name": "Privat"}]),
+    "/api/calendars/calendar.privat": _ha(_ha_termine),
+    "/api/states": _ha(lambda r: [
+        {"entity_id": "todo.einkauf", "state": "2", "attributes": {"friendly_name": "Einkauf"}},
+        {"entity_id": "weather.zuhause", "state": "partlycloudy", "attributes": {"temperature": 7.4, "temperature_unit": "°C", "humidity": 81}},
+        {"entity_id": "sensor.irgendwas", "state": "1", "attributes": {}},
+        {"entity_id": "sensor.handy_daily_steps", "state": "8432", "last_updated": dt.datetime.now(dt.timezone.utc).isoformat()},
+        {"entity_id": "sensor.altes_handy_daily_steps", "state": "12", "last_updated": "2020-01-01T10:00:00+00:00"},
+        {"entity_id": "sensor.handy_daily_distance", "state": "6240", "last_updated": "2020-01-01T10:00:00+00:00"},
+        {"entity_id": "sensor.handy_heart_rate", "state": "61", "last_updated": "2020-01-01T10:00:00+00:00"},
+        {"entity_id": "sensor.handy_resting_heart_rate", "state": "unknown"},
+    ]),
+    "/api/history/period/{start}": _ha(lambda r: [
+        [{"entity_id": "sensor.handy_daily_steps", "state": "3000", "last_changed": dt.datetime.now(dt.timezone.utc).isoformat()},
+         {"state": "8432", "last_changed": dt.datetime.now(dt.timezone.utc).isoformat()},
+         {"state": "unavailable", "last_changed": dt.datetime.now(dt.timezone.utc).isoformat()}],
+    ]),
+    "POST /api/services/todo/get_items": _ha(lambda r: {"service_response": {"todo.einkauf": {"items": [
+        {"summary": "Milch", "status": "needs_action"}, {"summary": "Paket abholen", "status": "needs_action", "due": "2020-01-01"}]}}}),
+}
 
 
 async def _ollama(request):
@@ -95,7 +140,7 @@ async def _container(request):
 class Erkunden(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.server = []
-        for antworten in ({"/": _ha_start, "/api/": _ha_api}, {"/": _ollama}, {"/": _hinaus}, {"/_ping": _ping, "/containers/json": _container}, PAPERLESS):
+        for antworten in (HA, {"/": _ollama}, {"/": _hinaus}, {"/_ping": _ping, "/containers/json": _container}, PAPERLESS):
             s = TestServer(_dienst(antworten), host="127.0.0.1")
             await s.start_server()
             self.server.append(s)
@@ -189,6 +234,34 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
             self.assertEqual((r.status, r.headers["Location"]), (303, "/login"), pfad)
         self.assertEqual((await self.c.get("/m/netzplan", allow_redirects=False)).status, 303)
 
+
+    async def test_mein_tag_aus_home_assistant(self):
+        await self.erkunden()
+        ha = next(d["id"] for d in await (await self.c.get("/api/dienste")).json() if d["name"] == "Home Assistant")
+        self.assertEqual((await self.c.get("/m/tag")).status, 404)
+        await self.c.post(f"/dienst/{ha}/verbinden", data={"csrf": self.csrf, "token": GUT}, allow_redirects=False)
+        self.assertTrue({"tag", "gesundheit"} <= self.aktiv())
+        r = await self.c.get("/m/tag")
+        text = await r.text()
+        self.assertEqual(r.status, 200)
+        for erwartet in ("Heute", "Zahnarzt", "23:30–23:50", "Praxis am Markt", "Morgen", "Geburtstag Oma", "ganztägig",
+                         "Einkauf", "2 offen", "Milch", "Paket abholen", "überfällig", "teils bewölkt", "7 °C", "81 % Luftfeuchte"):
+            self.assertIn(erwartet, text)
+        self.assertNotIn(GUT, text)
+        self.assertLess(text.index("Zahnarzt"), text.index("Geburtstag Oma"))
+        # Gesundheit: Werte der Handy-App, der neuere Sensor gewinnt, Unbekanntes fehlt
+        r = await self.c.get("/m/gesundheit")
+        text = await r.text()
+        self.assertEqual(r.status, 200)
+        for erwartet in ("Schritte", "8.432", "Strecke", "6,2", "Puls", "61", "Verlauf", "width: 100%"):
+            self.assertIn(erwartet, text)
+        self.assertNotIn("Ruhepuls", text)
+        self.assertNotIn(GUT, text)
+        # Schlüssel wird ungültig → verständliche Meldung statt Absturz
+        self.app[K_ABLAGE].setzen(module.schluesselname(ha, "token"), "abgelaufen")
+        r = await self.c.get("/m/tag")
+        self.assertEqual(r.status, 502)
+        self.assertIn("lehnt den Schlüssel ab", await r.text())
 
     async def test_von_hand_hinzufuegen_und_dokumente_lesen(self):
         self.assertNotIn("Dokumente</a>", await (await self.c.get("/onboarding")).text())

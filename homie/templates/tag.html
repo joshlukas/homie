@@ -1,0 +1,65 @@
+{% extends "basis.html" %}
+{% block titel %}Homie – Mein Tag{% endblock %}
+{% block inhalt %}
+{% if fehler %}
+<section class="kopf"><h1>Mein Tag</h1></section>
+<div class="glas leer"><h3>Gerade kein Überblick</h3><p class="meldung" role="alert">{{ fehler }}</p></div>
+{% else %}
+<section class="kopf">
+  <h1>{{ daten.gruss }}</h1>
+  <p class="leiser">{{ daten.datum }}</p>
+</section>
+
+<div class="kacheln">
+  <div class="glas kachel"><b>{{ daten.heute_anzahl }}</b><span>{{ 'Termin heute' if daten.heute_anzahl == 1 else 'Termine heute' }}</span></div>
+  <div class="glas kachel"><b>{{ daten.aufgaben_offen }}</b><span>{{ 'offene Aufgabe' if daten.aufgaben_offen == 1 else 'offene Aufgaben' }}</span></div>
+  {% if daten.wetter %}
+  <div class="glas kachel"><b>{% if daten.wetter.grad is not none %}{{ daten.wetter.grad | round | int }} {{ daten.wetter.einheit }}{% else %}–{% endif %}</b><span>{{ daten.wetter.lage }}{% if daten.wetter.feuchte is not none %} · {{ daten.wetter.feuchte | round | int }} % Luftfeuchte{% endif %}</span></div>
+  {% endif %}
+</div>
+
+<div class="spalten">
+  <section>
+    <h2 class="gruppe"><span>Termine</span></h2>
+    {% if daten.tage %}
+    {% for t in daten.tage %}
+    <div class="glas tagkarte{% if t.heute %} heute{% endif %}">
+      <h3>{{ t.name }}</h3>
+      <ul class="termine">
+        {% for e in t.termine %}
+        <li{% if e.vorbei %} class="vorbei"{% endif %}>
+          <time>{{ e.zeit }}</time>
+          <div><b>{{ e.titel }}</b>{% if e.ort %}<small>{{ e.ort }}</small>{% endif %}</div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="glas leer"><h3>Nichts geplant</h3><p class="leiser">{% if daten.kalender %}In den nächsten {{ daten.spanne }} Tagen steht nichts im Kalender.{% else %}Home Assistant kennt noch keinen Kalender. Richte dort einen ein (zum Beispiel über CalDAV), dann erscheinen die Termine hier.{% endif %}</p></div>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2 class="gruppe"><span>Aufgaben</span></h2>
+    {% if daten.aufgaben %}
+    {% for a in daten.aufgaben %}
+    <div class="glas tagkarte">
+      <h3>{{ a.name }} <span class="chip">{{ a.offen }} offen</span></h3>
+      {% if a.punkte %}
+      <ul class="aufgaben">
+        {% for p in a.punkte %}<li><i></i><span>{{ p.titel }}</span>{% if p.faellig %}<small class="{{ 'spaet' if p.faellig == 'überfällig' }}">{{ p.faellig }}</small>{% endif %}</li>{% endfor %}
+      </ul>
+      {% if a.offen > a.punkte | length %}<p class="leiser klein">und {{ a.offen - a.punkte | length }} weitere</p>{% endif %}
+      {% elif a.offen == 0 %}
+      <p class="leiser klein">Alles erledigt.</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="glas leer"><h3>Keine Aufgabenliste</h3><p class="leiser">Home Assistant kennt noch keine Aufgabenliste.</p></div>
+    {% endif %}
+  </section>
+</div>
+{% endif %}
+{% endblock %}

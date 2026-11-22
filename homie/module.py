@@ -49,7 +49,7 @@ MODULE: tuple[Modul, ...] = (
     Modul("onboarding", "Onboarding", "Dienste finden, verbinden und Module freischalten.", kern=True),
     Modul(
         "tag", "Mein Tag", "Termine, Aufgaben und das Wichtigste für heute.",
-        (Bedarf("kalender", "ein Kalender (CalDAV, z. B. Nextcloud)", ("app-passwort",)),), farbe="#ff5fa2",
+        (Bedarf("homeassistant", "Home Assistant (kennt Kalender, Aufgaben und Wetter)", ("token",)),), farbe="#ff5fa2",
     ),
     Modul(
         "aufnahme", "Aufnahme", "Sprachnotizen aufnehmen; eine lokale KI schreibt mit und ordnet ein.",
@@ -57,7 +57,7 @@ MODULE: tuple[Modul, ...] = (
     ),
     Modul(
         "gesundheit", "Gesundheit", "Schlaf, Bewegung und Messwerte im Verlauf.",
-        (Bedarf("homeassistant", "Home Assistant", ("token",)),), farbe="#3ddc97",
+        (Bedarf("homeassistant", "Home Assistant (mit der Handy-App, die Gesundheitswerte meldet)", ("token",)),), farbe="#3ddc97",
     ),
     Modul(
         "finanzen", "Finanzen", "Kontostand, Ausgaben und Ausblick auf den Monat.",

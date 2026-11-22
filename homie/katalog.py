@@ -47,7 +47,7 @@ KATALOG: tuple[Eintrag, ...] = (
         "homeassistant", "homeassistant", "Home Assistant", "Smart-Home-Zentrale",
         (8123, 80), ("<title>home assistant</title>",),
         felder=(Feld("token", _BESCHRIFTUNG, hinweis="Profil → Sicherheit → Langlebige Zugriffstoken"),),
-        schaltet_frei="Gesundheit", farbe="#3ddc97",
+        schaltet_frei="Mein Tag, Gesundheit", farbe="#3ddc97",
     ),
     Eintrag(
         "ollama", "ki-lokal", "Ollama", "Lokale KI für Text und Sprache",
@@ -66,7 +66,7 @@ KATALOG: tuple[Eintrag, ...] = (
             Feld("benutzer", "Benutzername", geheim=False),
             Feld("app-passwort", "App-Passwort", hinweis="Einstellungen → Sicherheit → Geräte & Sitzungen → Neues App-Passwort"),
         ),
-        schaltet_frei="Mein Tag", farbe="#ff5fa2",
+        farbe="#ff5fa2",
     ),
     Eintrag(
         "firefly", "finanzen", "Firefly III", "Haushaltsbuch",
