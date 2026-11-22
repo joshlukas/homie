@@ -133,7 +133,8 @@
 {% if plaene %}
 <div class="glas liste">
   {% for p in plaene %}
-  <p><span><a href="/plan/{{ p.id }}">{{ p.titel }}</a> · vorgeschlagen von {{ p.von }}</span><b class="stand {{ 'bereit' if p.machbar else 'fehler' }}">{{ 'Entwurf, machbar' if p.machbar else 'Entwurf, so nicht machbar' }}</b></p>
+  <p><span><a href="/plan/{{ p.id }}">{{ p.titel }}</a> · vorgeschlagen von {{ p.von }}</span>{% set texte = {'bestaetigt': 'wird ausgeführt', 'laeuft': 'wird ausgeführt', 'fertig': 'ausgeführt', 'fehler': 'angehalten'} %}
+  <b class="stand {{ 'fehler' if p.zustand == 'fehler' or (p.zustand == 'entwurf' and not p.machbar) else 'bereit' }}">{{ texte.get(p.zustand) or ('Entwurf, machbar' if p.machbar else 'Entwurf, so nicht machbar') }}</b></p>
   {% endfor %}
 </div>
 {% endif %}
@@ -154,6 +155,9 @@
       <input id="plan-{{ z.name }}" name="{{ z.name }}" type="number" min="{{ z.von }}" max="{{ z.bis }}" value="{{ z.standard }}" required></div>
       {% endfor %}
     </div>
+    <label for="plan-ssh">Dein öffentlicher SSH-Schlüssel (freiwillig)</label>
+    <input id="plan-ssh" name="ssh_schluessel" type="text" placeholder="ssh-ed25519 AAAA…" autocapitalize="off" spellcheck="false">
+    <small>Nur nötig, wenn du dich selbst auf der neuen VM anmelden willst. Der öffentliche Teil ist kein Geheimnis.</small>
     <button type="submit">Plan erstellen</button>
   </form>
   {% endfor %}

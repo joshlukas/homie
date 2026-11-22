@@ -4,8 +4,8 @@ Ein Plan sagt in einfachen Worten, was passieren würde, was dafür geladen wird
 Prüfung des Rechners ergeben hat. Vorschlagen darf ihn der Mensch oder ein helfender Agent;
 bestätigen kann ihn nur der angemeldete Mensch im Dashboard.
 
-Stand: Pläne werden entworfen, geprüft und angezeigt. Das Ausführen ist noch nicht eingebaut –
-in dieser Datei steht bewusst kein einziger schreibender Aufruf an Proxmox.
+In dieser Datei steht kein einziger schreibender Aufruf an Proxmox. Ausgeführt wird ein bestätigter
+Plan in ausfuehren.py.
 """
 from __future__ import annotations
 
@@ -69,6 +69,11 @@ def _parameter(r: Rezept, eingabe: dict) -> dict:
         if not z.von <= wert <= z.bis:
             raise PlanFehler(f"{z.titel}: erlaubt sind {z.von} bis {z.bis}{' ' + z.einheit if z.einheit else ''}.")
         werte[z.name] = wert
+    eigener = " ".join(str(eingabe.get("ssh_schluessel", "")).split())
+    if eigener:
+        if not re.fullmatch(r"(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)) [A-Za-z0-9+/=]{40,1000}( [\w@.+-]{1,80})?", eigener):
+            raise PlanFehler("Das ist kein öffentlicher SSH-Schlüssel. Er beginnt mit „ssh-ed25519“ oder „ssh-rsa“ und ist eine einzige Zeile.")
+        werte["ssh_schluessel"] = eigener
     return werte
 
 
@@ -89,6 +94,7 @@ async def entwerfen(db: Datenbank, zugang: tuple[str, dict[str, str]], kennung: 
             nummer = await proxmox.holen(s, basis, "/cluster/nextid")
             speicher = await proxmox.holen(s, basis, f"/nodes/{n}/storage") or []
             netze = await proxmox.holen(s, basis, f"/nodes/{n}/network?type=bridge", pflicht=False) or []
+            rechte = await proxmox.holen(s, basis, "/access/permissions", pflicht=False) or {}
             image = False
             for sp in speicher:
                 if sp.get("active") and set(str(sp.get("content", "")).split(",")) & {"import", "iso"}:
@@ -106,7 +112,7 @@ async def entwerfen(db: Datenbank, zugang: tuple[str, dict[str, str]], kennung: 
 
     pruefung = [
         {"ok": frei_danach >= RESERVE_GB,
-         "text": f"Arbeitsspeicher: {knoten['ram_frei']:g} GB sind frei; nach dem Anlegen blieben {frei_danach:g} GB."
+         "text": f"Arbeitsspeicher: {_de(knoten['ram_frei'])} GB sind frei; nach dem Anlegen blieben {_de(frei_danach)} GB."
                  + ("" if frei_danach >= RESERVE_GB else f" Das ist zu knapp – mindestens {RESERVE_GB} GB sollen frei bleiben.")},
         {"ok": bool(ziel) and platz >= p["platte_gb"],
          "text": f"Plattenplatz: auf „{ziel['storage']}“ sind {platz} GB frei." if ziel else "Plattenplatz: Es gibt keinen Speicher für VM-Platten."},
@@ -127,7 +133,13 @@ async def entwerfen(db: Datenbank, zugang: tuple[str, dict[str, str]], kennung: 
         "Aus dem Internet wird nichts erreichbar gemacht.",
         "Rückgängig machen: Die neue VM lässt sich in Proxmox jederzeit löschen; sonst ändert sich nichts.",
     ]
-    technik = {"knoten": n, "vmid": nummer, "speicher": ziel["storage"] if ziel else "", "bruecke": bruecke, "image_vorhanden": image}
+    kann = lambda sp, was: sp.get("active") and was in str(sp.get("content", "")).split(",")
+    technik = {"knoten": n, "vmid": nummer, "speicher": ziel["storage"] if ziel else "", "bruecke": bruecke, "image_vorhanden": image,
+               "lager": next((sp["storage"] for sp in speicher if kann(sp, "import")), ""),
+               "scheiben": next((sp["storage"] for sp in speicher if kann(sp, "iso")), "")}
+    technik["rechte_fehlen"] = rechte_fehlen(rechte, technik)
+    if p.get("ssh_schluessel"):
+        schritte[2] += " Zusätzlich wird dein eigener öffentlicher Schlüssel hinterlegt, damit du selbst auf die VM kommst."
     jetzt = int(time.time())
     c = db.ausfuehren(
         "INSERT INTO plan (rezept, titel, parameter, inhalt, zustand, von, angelegt, geaendert) VALUES (?,?,?,?,'entwurf',?,?,?)",
@@ -140,7 +152,8 @@ async def entwerfen(db: Datenbank, zugang: tuple[str, dict[str, str]], kennung: 
 def _zeile(z) -> dict:
     inhalt = json.loads(z["inhalt"])
     return {"id": z["id"], "rezept": z["rezept"], "titel": z["titel"], "parameter": json.loads(z["parameter"]), "zustand": z["zustand"],
-            "von": z["von"], "angelegt": z["angelegt"], **inhalt, "machbar": all(p["ok"] for p in inhalt["pruefung"])}
+            "von": z["von"], "angelegt": z["angelegt"], **inhalt, "machbar": all(p["ok"] for p in inhalt["pruefung"]),
+            "protokoll": json.loads(z["protokoll"] or "[]"), "ergebnis": json.loads(z["ergebnis"] or "{}")}
 
 
 def alle(db: Datenbank) -> list[dict]:
@@ -150,6 +163,68 @@ def alle(db: Datenbank) -> list[dict]:
 def einer(db: Datenbank, nummer: int) -> dict | None:
     z = db.eine("SELECT * FROM plan WHERE id=?", (nummer,))
     return _zeile(z) if z else None
+
+
+VM_RECHTE = ("VM.Allocate", "VM.Config.Disk", "VM.Config.CPU", "VM.Config.Memory", "VM.Config.Network", "VM.Config.Options",
+             "VM.Config.CDROM", "VM.PowerMgmt")
+
+
+def _de(zahl: float) -> str:
+    return f"{zahl:g}".replace(".", ",")
+
+
+def _wirksam(rechte: dict, pfad: str) -> dict:
+    """Rechte an einem Pfad; fehlt er, gelten die des nächsthöheren (Proxmox vererbt nach unten)."""
+    while True:
+        if pfad in rechte:
+            return rechte[pfad] or {}
+        if pfad in ("", "/"):
+            return {}
+        pfad = pfad.rsplit("/", 1)[0] or "/"
+
+
+def rechte_fehlen(rechte: dict, technik: dict) -> list[str]:
+    """Was dem Token zum Anlegen fehlt – in Worten. Leere Liste: alles da."""
+    fehlt = []
+    vm = {**_wirksam(rechte, f"/vms/{technik['vmid']}"), **rechte.get("/pool/homie", {})}
+    if not all(vm.get(r) for r in VM_RECHTE):
+        fehlt.append("virtuelle Maschinen anlegen, einstellen und starten")
+    if not _wirksam(rechte, f"/storage/{technik['speicher']}").get("Datastore.AllocateSpace"):
+        fehlt.append(f"Platz auf „{technik['speicher']}“ belegen")
+    for sp in {technik.get("lager"), technik.get("scheiben")} - {"", None}:
+        if not _wirksam(rechte, f"/storage/{sp}").get("Datastore.AllocateTemplate"):
+            fehlt.append(f"Image und Startscheibe auf „{sp}“ ablegen")
+    if not _wirksam(rechte, f"/sdn/zones/localnetwork/{technik['bruecke']}").get("SDN.Use"):
+        fehlt.append(f"das Netz „{technik['bruecke']}“ benutzen")
+    if not technik.get("image_vorhanden") and not _wirksam(rechte, "/").get("Sys.AccessNetwork"):
+        fehlt.append("das Ubuntu-Image aus dem Internet laden")
+    return fehlt
+
+
+def rechte_befehle(token_id: str, technik: dict) -> list[str]:
+    """Befehle für die Proxmox-Shell, die dem Token genau die nötigen Rechte geben – und keine an bestehenden VMs."""
+    orte = ["/pool/homie", f"/storage/{technik['speicher']}"] + sorted({f"/storage/{sp}" for sp in (technik.get("lager"), technik.get("scheiben")) if sp} - {f"/storage/{technik['speicher']}"}) + ["/sdn/zones/localnetwork"]
+    return [
+        'pveum role add HomieAnlegen -privs "VM.Allocate VM.Audit VM.Config.CDROM VM.Config.CPU VM.Config.Disk VM.Config.Memory '
+        'VM.Config.Network VM.Config.Options VM.PowerMgmt VM.GuestAgent.Audit Datastore.AllocateSpace Datastore.AllocateTemplate Datastore.Audit SDN.Use"',
+        'pveum role add HomieLaden -privs "Sys.AccessNetwork Sys.Audit"',
+        "pveum pool add homie",
+        *[f"pveum acl modify {ort} -token '{token_id}' -role HomieAnlegen" for ort in orte],
+        f"pveum acl modify / -token '{token_id}' -role HomieLaden",
+    ]
+
+
+def bestaetigen(db: Datenbank, nummer: int) -> bool:
+    c = db.ausfuehren("UPDATE plan SET zustand='bestaetigt', geaendert=? WHERE id=? AND zustand='entwurf'", (int(time.time()), nummer))
+    return c.rowcount == 1
+
+
+def unterbrochene_markieren(db: Datenbank) -> None:
+    """Nach einem Neustart von Homie: Läufe, die mittendrin waren, ehrlich als unterbrochen kennzeichnen."""
+    for z in db.alle("SELECT id, protokoll FROM plan WHERE zustand IN ('bestaetigt', 'laeuft')"):
+        protokoll = json.loads(z["protokoll"] or "[]") + [{"zeit": int(time.time()), "art": "fehler",
+                    "text": "Homie wurde währenddessen neu gestartet. Bitte in Proxmox nachsehen, wie weit die neue VM gekommen ist."}]
+        db.ausfuehren("UPDATE plan SET zustand='fehler', protokoll=? WHERE id=?", (json.dumps(protokoll), z["id"]))
 
 
 def verwerfen(db: Datenbank, nummer: int) -> None:

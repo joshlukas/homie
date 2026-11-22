@@ -11,7 +11,7 @@ import aiohttp
 import jinja2
 from aiohttp import web
 
-from . import agenten, assistent, dokumente, gesundheit, katalog, module, plaene, proxmox, tag, verbinden
+from . import agenten, assistent, ausfuehren, dokumente, gesundheit, katalog, module, plaene, proxmox, tag, verbinden
 from .ablage import Ablage
 from .anmeldung import COOKIE, MIN_LAENGE, Anmeldung, passwort_maengel
 from .config import PAKET, VERSION, Einstellungen
@@ -34,6 +34,7 @@ K_JINJA = web.AppKey("jinja", jinja2.Environment)
 K_ERK = web.AppKey("erkundung", Erkundung)
 K_SITZUNG = web.RequestKey("sitzung", object)
 K_AGENT = web.RequestKey("agent", str)
+K_LAUF = web.AppKey("lauf", dict)
 
 
 def _ist_api(request: web.Request) -> bool:
@@ -443,7 +444,22 @@ def _plan(request: web.Request) -> dict:
 
 
 async def plan_zeigen(request: web.Request) -> web.Response:
-    return _seite(request, "plan.html", plan=_plan(request))
+    plan = _plan(request)
+    zugang = _zugang(request.app, "virtualisierung", ("token-id", "token"))
+    befehle = plaene.rechte_befehle(zugang[1]["token-id"], plan["technik"]) if zugang and plan["technik"].get("rechte_fehlen") else []
+    return _seite(request, "plan.html", plan=plan, befehle=befehle, fehler=request.query.get("fehler", ""))
+
+
+async def plan_bestaetigen(request: web.Request) -> web.Response:
+    """Nur der angemeldete Mensch kommt hierher. Erst jetzt wird an Proxmox geschrieben."""
+    app, plan = request.app, _plan(request)
+    zugang = _zugang(app, "virtualisierung", ("token-id", "token"))
+    if zugang is None or plan["zustand"] != "entwurf" or not plan["machbar"] or plan["technik"].get("rechte_fehlen") \
+            or str((await request.post()).get("gelesen", "")) != "ja":
+        raise web.HTTPSeeOther(f"/plan/{plan['id']}?fehler=1")
+    if plaene.bestaetigen(app[K_DB], plan["id"]):
+        ausfuehren.starten(app[K_DB], app[K_ABLAGE], zugang, plan, **app[K_LAUF])
+    raise web.HTTPSeeOther(f"/plan/{plan['id']}")
 
 
 async def plan_verwerfen(request: web.Request) -> web.Response:
@@ -471,7 +487,8 @@ AGENT_REGELN = [
 
 
 def _plan_kurz(p: dict) -> dict:
-    return {k: p[k] for k in ("id", "titel", "rezept", "parameter", "zustand", "von", "machbar", "schritte", "pruefung", "grenzen")}
+    kurz = {k: p[k] for k in ("id", "titel", "rezept", "zustand", "von", "machbar", "schritte", "pruefung", "grenzen", "protokoll", "ergebnis")}
+    return {**kurz, "parameter": {k: v for k, v in p["parameter"].items() if k != "ssh_schluessel"}}
 
 
 async def agent_start(request: web.Request) -> web.Response:
@@ -602,7 +619,8 @@ async def api_netzplan(request: web.Request) -> web.Response:
     return web.json_response(_netzplan(request.app), dumps=lambda o: json.dumps(o, default=lambda x: x.__dict__))
 
 
-def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, erkundung_ports: tuple[int, ...] | None = None) -> web.Application:
+def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, erkundung_ports: tuple[int, ...] | None = None,
+              lauf: dict | None = None) -> web.Application:
     app = web.Application(middlewares=[kopfzeilen, herkunft, torwaechter], client_max_size=64 * 1024)
     db = Datenbank(einst.datenbank)
     app[K_EINST] = einst
@@ -610,6 +628,8 @@ def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, er
     app[K_ANM] = Anmeldung(db, einst.sitzung_tage)
     app[K_ABLAGE] = Ablage(db, einst.daten, einst.hauptschluessel)
     app[K_ERK] = Erkundung(db, einst.docker_url, erkundung_ziele, erkundung_ports)
+    app[K_LAUF] = lauf or {}
+    plaene.unterbrochene_markieren(db)
     app[K_JINJA] = jinja2.Environment(
         loader=jinja2.FileSystemLoader(PAKET / "templates"), autoescape=True, trim_blocks=True, lstrip_blocks=True
     )
@@ -630,6 +650,7 @@ def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, er
         web.post("/plan/neu", plan_neu),
         web.get("/plan/{id:\\d+}", plan_zeigen),
         web.post("/plan/{id:\\d+}/verwerfen", plan_verwerfen),
+        web.post("/plan/{id:\\d+}/bestaetigen", plan_bestaetigen),
         web.post("/helfer/neu", helfer_neu),
         web.post("/helfer/{id:\\d+}/entziehen", helfer_entziehen),
         web.get("/agent", agent_start),

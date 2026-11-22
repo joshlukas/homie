@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS plan (               -- Pläne: erst lesen und bestä
     titel TEXT NOT NULL,
     parameter TEXT NOT NULL,
     inhalt TEXT NOT NULL,                       -- Schritte, Prüfung, Grenzen, technische Angaben
-    zustand TEXT NOT NULL DEFAULT 'entwurf',    -- entwurf | verworfen
+    zustand TEXT NOT NULL DEFAULT 'entwurf',    -- entwurf | verworfen | bestaetigt | laeuft | fertig | fehler
     von TEXT NOT NULL DEFAULT '',
     angelegt INTEGER NOT NULL,
     geaendert INTEGER NOT NULL
@@ -90,6 +90,11 @@ class Datenbank:
         self._c.execute("PRAGMA journal_mode=WAL")
         self._c.execute("PRAGMA foreign_keys=ON")
         self._c.executescript(SCHEMA)
+        # Spalten, die später dazukamen – bestehende Installationen bekommen sie nachgereicht.
+        vorhanden = {z["name"] for z in self._c.execute("PRAGMA table_info(plan)")}
+        for spalte in ("protokoll", "ergebnis"):
+            if spalte not in vorhanden:
+                self._c.execute(f"ALTER TABLE plan ADD COLUMN {spalte} TEXT NOT NULL DEFAULT ''")
         try:
             os.chmod(pfad, 0o600)
         except OSError:

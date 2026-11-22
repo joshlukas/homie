@@ -50,6 +50,8 @@ Ein vorgeschlagener Plan ist ein Entwurf. Lesen, bestätigen und ausführen kann
 | `homie/dokumente.py` | Modul Dokumente: liest Paperless-ngx (nur lesend, nichts wird gespeichert) |
 | `homie/proxmox.py` | Proxmox lesen (VMs, Container, Speicher) |
 | `homie/plaene.py` | Pläne entwerfen und prüfen; enthält bewusst keinen schreibenden Aufruf |
+| `homie/ausfuehren.py` | einzige Stelle, die an Proxmox schreibt: legt nach Bestätigung genau eine neue VM an, löscht nie |
+| `homie/startscheibe.py` | Einrichtungsanweisung für die neue VM als kleines CD-Abbild |
 | `homie/agenten.py` | Schlüssel für helfende Agenten, Wege unter `/agent/…` |
 | `homie/db.py`, `homie/config.py` | Datenbank im Datenordner, Einstellungen |
 | `tests/` | `python -m unittest discover -s tests -v` muss vor jeder Änderung und danach grün sein |

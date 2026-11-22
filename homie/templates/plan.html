@@ -1,29 +1,78 @@
 {% extends "basis.html" %}
 {% block titel %}Homie – Plan{% endblock %}
+{% block kopf %}{% if plan.zustand in ('bestaetigt', 'laeuft') %}<meta http-equiv="refresh" content="3">{% endif %}{% endblock %}
 {% block inhalt %}
+{% set laeuft = plan.zustand in ('bestaetigt', 'laeuft') %}
 <section class="kopf">
   <h1>{{ plan.titel }}</h1>
-  <p class="leiser">Vorgeschlagen von {{ plan.von }}. Das ist ein Entwurf: Bis jetzt wurde nichts angelegt und nichts geladen.</p>
+  <p class="leiser">Vorgeschlagen von {{ plan.von }}.
+  {% if plan.zustand == 'entwurf' %}Das ist ein Entwurf: Bis jetzt wurde nichts angelegt und nichts geladen.
+  {% elif laeuft %}Der Plan wird gerade ausgeführt. Die Seite aktualisiert sich von selbst.
+  {% elif plan.zustand == 'fertig' %}Der Plan wurde ausgeführt.
+  {% else %}Der Lauf wurde angehalten – siehe Protokoll.{% endif %}</p>
 </section>
 
-<h2 class="gruppe"><span>Was passieren würde</span></h2>
+{% if plan.protokoll or laeuft %}
+<h2 class="gruppe"><span>Protokoll</span></h2>
+<div class="glas tagkarte">
+  <ul class="plan-pruefung">
+    {% for z in plan.protokoll %}<li class="{{ {'gut': 'gut', 'fehler': 'schlecht'}.get(z.art, '') }}"><i aria-hidden="true">{{ {'gut': '✓', 'fehler': '✗'}.get(z.art, '·') }}</i><span>{{ z.text }}</span></li>{% endfor %}
+    {% if laeuft %}<li><i aria-hidden="true">…</i><span class="leiser">läuft</span></li>{% endif %}
+  </ul>
+</div>
+{% endif %}
+
+<h2 class="gruppe"><span>{{ 'Was passieren würde' if plan.zustand == 'entwurf' else 'Der Plan' }}</span></h2>
 <div class="glas tagkarte"><ol class="plan-schritte">{% for s in plan.schritte %}<li>{{ s }}</li>{% endfor %}</ol></div>
 
+{% if plan.zustand == 'entwurf' %}
 <h2 class="gruppe"><span>Prüfung deines Rechners</span></h2>
 <div class="glas tagkarte">
-  <ul class="plan-pruefung">{% for p in plan.pruefung %}<li class="{{ 'gut' if p.ok else 'schlecht' }}"><i aria-hidden="true">{{ '✓' if p.ok else '✗' }}</i><span>{{ p.text }}</span></li>{% endfor %}</ul>
+  <ul class="plan-pruefung">
+    {% for p in plan.pruefung %}<li class="{{ 'gut' if p.ok else 'schlecht' }}"><i aria-hidden="true">{{ '✓' if p.ok else '✗' }}</i><span>{{ p.text }}</span></li>{% endfor %}
+    {% if plan.technik.rechte_fehlen is defined %}
+    {% if plan.technik.rechte_fehlen %}
+    <li class="schlecht"><i aria-hidden="true">✗</i><span>Dein Proxmox-Schlüssel darf bisher nur lesen. Zum Ausführen fehlt ihm: {{ plan.technik.rechte_fehlen | join('; ') }}.</span></li>
+    {% else %}
+    <li class="gut"><i aria-hidden="true">✓</i><span>Dein Proxmox-Schlüssel hat die nötigen Rechte.</span></li>
+    {% endif %}
+    {% endif %}
+  </ul>
+  {% if befehle %}
+  <details class="mehr">
+    <summary>So gibst du dem Schlüssel genau diese Rechte</summary>
+    <p class="leiser klein">In Proxmox links den Rechner anklicken, dann „Shell“ öffnen und diese Zeilen einfügen. Der Schlüssel darf danach nur VMs im neuen Bereich „homie“ anlegen und verwalten – an deinen bestehenden VMs kann er weiterhin nichts ändern. Erstelle den Plan danach neu.</p>
+    <pre class="schluessel">{{ befehle | join('\n') }}</pre>
+  </details>
+  {% endif %}
 </div>
+{% endif %}
 
 <h2 class="gruppe"><span>Was nicht passiert</span></h2>
 <div class="glas tagkarte"><ul class="plan-grenzen">{% for g in plan.grenzen %}<li>{{ g }}</li>{% endfor %}</ul></div>
 
-<div class="knoepfe">
-  <button type="button" disabled>Bestätigen und ausführen (folgt)</button>
-  <form method="post" action="/plan/{{ plan.id }}/verwerfen">
+{% if plan.zustand == 'entwurf' %}
+{% set bereit = plan.machbar and plan.technik.rechte_fehlen is defined and not plan.technik.rechte_fehlen %}
+{% if fehler %}<p class="meldung" role="alert">Der Plan wurde nicht gestartet. Bitte den Haken setzen – oder der Plan ist so nicht ausführbar.</p>{% endif %}
+<div class="glas leer" style="margin-top: 18px">
+  {% if bereit %}
+  <form method="post" action="/plan/{{ plan.id }}/bestaetigen">
     <input type="hidden" name="csrf" value="{{ csrf }}">
-    <button type="submit" class="leise">Plan verwerfen</button>
+    <label class="haken"><input type="checkbox" name="gelesen" value="ja" required> Ich habe den Plan gelesen und möchte, dass Homie ihn jetzt ausführt.</label>
+    <button type="submit">Bestätigen und ausführen</button>
   </form>
-  <a class="knopf leise" href="/onboarding#plaene">Zurück</a>
+  {% else %}
+  <p class="leiser">{% if not plan.machbar %}So ist der Plan nicht machbar – siehe Prüfung. Verwirf ihn und plane kleiner.{% elif plan.technik.rechte_fehlen is not defined %}Dieser Plan ist älter als die Ausführen-Funktion. Verwirf ihn und erstelle ihn neu.{% else %}Ausführen geht erst, wenn der Schlüssel die nötigen Rechte hat.{% endif %}</p>
+  {% endif %}
+  <div class="knoepfe">
+    <form method="post" action="/plan/{{ plan.id }}/verwerfen">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit" class="leise">Plan verwerfen</button>
+    </form>
+    <a class="knopf leise" href="/onboarding#plaene">Zurück</a>
+  </div>
 </div>
-<p class="leiser klein" style="margin-top: 12px">{% if plan.machbar %}Das Ausführen wird im nächsten Ausbauschritt freigeschaltet.{% else %}So ist der Plan nicht machbar – siehe Prüfung. Verwirf ihn und plane kleiner.{% endif %}</p>
+{% else %}
+<div class="knoepfe"><a class="knopf leise" href="/onboarding#plaene">Zurück</a>{% if plan.zustand == 'fertig' %}<a class="knopf" href="/m/netzplan">Zum Netzplan</a>{% endif %}</div>
+{% endif %}
 {% endblock %}

@@ -2,7 +2,7 @@
 
 Ein Dashboard fürs Heimnetz, das sich selbst aufbaut: Homie erkundet dein Netz (nur lesend), zeigt gefundene Dienste als Karten, und sobald du einen Dienst verbindest, schaltet sich das passende Modul ein – Tagesüberblick, Aufnahme mit lokaler KI, Gesundheit, Finanzen, Dokumente, Netzplan.
 
-**Stand: Etappe 3 (begonnen).** Installation, Anmeldung, Erkundung des Heimnetzes, Verbinden mit geprüften Schlüsseln, Netzplan mit virtuellen Maschinen, Pläne für neue VMs (noch ohne Ausführen), Schnittstelle für helfende Agenten – und fünf Module mit Inhalt:
+**Stand: Etappe 3 (begonnen).** Installation, Anmeldung, Erkundung des Heimnetzes, Verbinden mit geprüften Schlüsseln, Netzplan mit virtuellen Maschinen, Pläne für neue VMs samt Ausführen nach Bestätigung, Schnittstelle für helfende Agenten – und fünf Module mit Inhalt:
 
 - **Mein Tag** – Termine, Aufgaben und Wetter aus Home Assistant
 - **Gesundheit** – Schritte, Puls, Schlaf und mehr aus der Home-Assistant-App des Handys, mit Wochenverlauf
@@ -77,7 +77,9 @@ Homie meldet sich dabei nirgends an und ändert nichts. Das Ergebnis liegt aussc
 
 ## Pläne und helfende Agenten
 
-Ist Proxmox verbunden, zeigt der Netzplan auch die virtuellen Maschinen, und Homie kann **Pläne** für neue VMs aufschreiben: was angelegt würde, was dafür geladen wird und woher, und ob dein Rechner genug Arbeitsspeicher und Platz hat. Ein Plan ist ein Entwurf – angelegt wird nichts. Das Ausführen bestätigter Pläne ist noch nicht eingebaut.
+Ist Proxmox verbunden, zeigt der Netzplan auch die virtuellen Maschinen, und Homie kann **Pläne** für neue VMs aufschreiben: was angelegt würde, was dafür geladen wird und woher, und ob dein Rechner genug Arbeitsspeicher und Platz hat. Ein Plan ist ein Entwurf – angelegt wird nichts.
+
+**Ausführen** kann Homie einen Plan nur, wenn drei Dinge zusammenkommen: der Plan ist machbar, das Proxmox-Token hat die nötigen Schreibrechte (mit einem nur lesenden Token gibt es den Knopf gar nicht; die Planseite nennt die fehlenden Rechte und die Befehle dafür), und du setzt im Dashboard den Haken und bestätigst. Dann legt Homie genau eine neue VM an, gibt ihr eine Einrichtungsanweisung mit (Benutzer ohne Passwort, nur Schlüssel; Docker) und schreibt jeden Schritt ins Protokoll. Bestehende VMs fasst Homie nicht an, und es löscht nie etwas – das steht so im Programm ([homie/ausfuehren.py](homie/ausfuehren.py)) und wird von den Tests überwacht. Empfohlen ist ein eigener Proxmox-Bereich („Pool“) `homie`: Dann *kann* das Token an bestehenden VMs auch gar nichts ändern.
 
 Wer sich von einem KI-Agenten helfen lässt, erzeugt ihm im Onboarding einen eigenen Schlüssel. Damit kann der Agent den Stand lesen und Pläne vorschlagen; bestätigen, verbinden oder Schlüssel sehen kann er nicht. Einzelheiten in [AGENTS.md](AGENTS.md).
 
