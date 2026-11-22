@@ -96,6 +96,7 @@ Jedes Modul erklärt in [homie/module.py](homie/module.py), welchen Dienst und w
 ## Alltag
 
 - **Aktualisieren:** Portainer → Stack → *Pull and redeploy* (mit *Re-pull image*). Ohne Portainer: `docker compose pull && docker compose up -d`.
+- **Dienst ohne Browser verbinden:** `docker exec -i homie python -m homie verbinden "Home Assistant" token < datei-mit-dem-token` – der Schlüssel kommt über die Eingabe, wird beim Dienst geprüft und verschlüsselt abgelegt; angezeigt wird er nie. Mit `--adresse URL` wird der Dienst vorher hinzugefügt.
 - **Passwort vergessen:** `docker exec homie python -m homie passwort-zuruecksetzen` – danach legst du im Browser ein neues an. Daten und Schlüssel bleiben.
 - **Entfernen:** Stack löschen. Das Volume `homie-daten` bleibt, bis du es ausdrücklich löschst.
 

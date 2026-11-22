@@ -449,6 +449,26 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         self.c.session.cookie_jar.clear()
         self.assertEqual((await self.c.get("/s/blueprint", allow_redirects=False)).status, 303)
 
+    async def test_verbinden_ohne_browser(self):
+        from homie.__main__ import dienst_verbinden
+        db, ablage = self.app[K_DB], self.app[K_ABLAGE]
+        ha = f"http://127.0.0.1:{self.server[0].port}"
+        ziel = f"http://127.0.0.1:{self.notizdienst}"
+        self.assertEqual((await dienst_verbinden(db, ablage, "Notiz-Assistent", ["token"], ["falsch"], ziel))[0], False)   # abgelehnt: nichts gespeichert
+        self.assertEqual(ablage.namen(), [])
+        self.assertEqual((await dienst_verbinden(db, ablage, "Notiz-Assistent", ["passwort"], [GUT], ziel))[0], False)   # falsches Feld
+        self.assertEqual((await dienst_verbinden(db, ablage, "Notiz-Assistent", ["token"], [], ziel))[0], False)          # kein Wert
+        self.assertEqual((await dienst_verbinden(db, ablage, "Gibtsnicht", ["token"], [GUT]))[0], False)
+        in_ordnung, meldung = await dienst_verbinden(db, ablage, "notiz-assistent", ["token"], [GUT], ziel)
+        self.assertTrue(in_ordnung, meldung)
+        self.assertNotIn(GUT, meldung)
+        in_ordnung, meldung = await dienst_verbinden(db, ablage, "Home Assistant", ["token"], [GUT], ha)
+        self.assertTrue(in_ordnung, meldung)
+        in_ordnung, _ = await dienst_verbinden(db, ablage, "Home Assistant", ["token"], [GUT], ha)                      # zweimal ist unschädlich
+        self.assertTrue(in_ordnung)
+        self.assertTrue({"aufnahme", "finanzen", "assistent", "tag", "gesundheit"} <= self.aktiv())
+        self.assertEqual(len([d for d in await (await self.c.get("/api/dienste")).json()]), 2)
+
     async def test_von_hand_hinzufuegen_und_dokumente_lesen(self):
         self.assertNotIn("Dokumente</a>", await (await self.c.get("/onboarding")).text())
         # Unsinn und Unbekanntes werden abgelehnt
