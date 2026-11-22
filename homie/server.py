@@ -3,21 +3,20 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import ipaddress
 import json
-import warnings
 from urllib.parse import urlsplit
 
 import aiohttp
 import jinja2
 from aiohttp import web
 
-from . import module
+from . import katalog, module, verbinden
 from .ablage import Ablage
 from .anmeldung import COOKIE, MIN_LAENGE, Anmeldung, passwort_maengel
 from .config import PAKET, VERSION, Einstellungen
 from .db import Datenbank
-
-warnings.filterwarnings("ignore", category=web.NotAppKeyWarning)
+from .erkundung import Erkundung, letzte
 
 OEFFENTLICH = ("/login", "/einrichten")
 KOPFZEILEN = {
@@ -32,6 +31,8 @@ K_DB = web.AppKey("db", Datenbank)
 K_ANM = web.AppKey("anmeldung", Anmeldung)
 K_ABLAGE = web.AppKey("ablage", Ablage)
 K_JINJA = web.AppKey("jinja", jinja2.Environment)
+K_ERK = web.AppKey("erkundung", Erkundung)
+K_SITZUNG = web.RequestKey("sitzung", object)
 
 
 def _ist_api(request: web.Request) -> bool:
@@ -81,7 +82,7 @@ async def torwaechter(request: web.Request, handler):
         return await handler(request)
     anm = request.app[K_ANM]
     sitzung = anm.sitzung_finden(request.cookies.get(COOKIE))
-    request["sitzung"] = sitzung
+    request[K_SITZUNG] = sitzung
     if request.path in OEFFENTLICH:
         return await handler(request)
     if sitzung is None:
@@ -99,7 +100,7 @@ async def torwaechter(request: web.Request, handler):
 
 def _seite(request: web.Request, vorlage: str, status: int = 200, **werte) -> web.Response:
     app = request.app
-    sitzung = request.get("sitzung")
+    sitzung = request.get(K_SITZUNG)
     menue = []
     if sitzung is not None:
         menue = [s.modul for s in module.stand(app[K_DB], app[K_ABLAGE]) if s.aktiv]
@@ -124,7 +125,7 @@ async def _rechnen(funktion, *werte):
 
 async def einrichten_zeigen(request: web.Request) -> web.Response:
     if request.app[K_ANM].eingerichtet():
-        raise web.HTTPSeeOther("/" if request.get("sitzung") else "/login")
+        raise web.HTTPSeeOther("/" if request.get(K_SITZUNG) else "/login")
     return _seite(request, "einrichten.html", min_laenge=MIN_LAENGE, fehler=None)
 
 
@@ -147,7 +148,7 @@ async def einrichten(request: web.Request) -> web.Response:
 async def login_zeigen(request: web.Request) -> web.Response:
     if not request.app[K_ANM].eingerichtet():
         raise web.HTTPSeeOther("/einrichten")
-    if request.get("sitzung"):
+    if request.get(K_SITZUNG):
         raise web.HTTPSeeOther("/")
     return _seite(request, "login.html", fehler=None)
 
@@ -171,7 +172,7 @@ async def login(request: web.Request) -> web.Response:
 
 
 async def logout(request: web.Request) -> web.Response:
-    request.app[K_ANM].sitzung_beenden(request["sitzung"].kennung)
+    request.app[K_ANM].sitzung_beenden(request[K_SITZUNG].kennung)
     antwort = web.HTTPSeeOther("/login")
     antwort.del_cookie(COOKIE, path="/")
     raise antwort
@@ -200,33 +201,132 @@ async def _docker_stand(app: web.Application) -> dict:
 def _dienste(app: web.Application) -> list[dict]:
     return [
         {**dict(z), "details": json.loads(z["details"] or "{}")}
-        for z in app[K_DB].alle("SELECT id, art, name, adresse, zustand, gefunden, details FROM dienst ORDER BY name")
+        for z in app[K_DB].alle("SELECT id, art, name, adresse, zustand, gefunden, details FROM dienst ORDER BY name, adresse")
     ]
+
+
+def _karten(app: web.Application) -> list[dict]:
+    """Gefundene Dienste so aufbereitet, wie die Onboarding-Karten sie brauchen."""
+    stand = letzte(app[K_DB]) or {}
+    karten = []
+    for d in _dienste(app):
+        e = katalog.eintrag(d["details"].get("kennung", ""))
+        karten.append({
+            "id": d["id"], "name": d["name"], "zustand": d["zustand"], "adresse": d["adresse"],
+            "geraet": d["details"].get("geraet", ""),
+            "beschreibung": e.beschreibung if e else d["art"], "farbe": e.farbe if e else "#8b7cff",
+            "felder": e.felder if e else (), "schaltet_frei": e.schaltet_frei if e else "",
+            "vermisst": bool(stand) and d["details"].get("gesehen", 0) < stand.get("zeit", 0),
+        })
+    return karten
 
 
 def _beispiele(app: web.Application) -> list[dict]:
     try:
-        return json.loads(app[K_EINST].beispiele.read_text(encoding="utf-8"))["dienste"]
+        roh = json.loads(app[K_EINST].beispiele.read_text(encoding="utf-8"))["dienste"]
     except (OSError, ValueError, KeyError):
         return []
+    return [{
+        "id": 0, "name": d["name"], "zustand": d["zustand"], "adresse": d["adresse"], "geraet": "", "farbe": d.get("farbe", "#8b7cff"),
+        "beschreibung": d["details"].get("beschreibung", ""), "felder": (), "braucht": d["details"].get("braucht", ""),
+        "schaltet_frei": d["details"].get("schaltet_frei", ""), "vermisst": False,
+    } for d in roh]
 
 
-async def onboarding(request: web.Request) -> web.Response:
+async def onboarding(request: web.Request, status: int = 200, kartenfehler: dict | None = None) -> web.Response:
     app = request.app
     beispiel = request.query.get("beispiel") == "1"
+    erk = app[K_ERK]
+    karten = _beispiele(app) if beispiel else _karten(app)
     return _seite(
-        request, "onboarding.html",
+        request, "onboarding.html", status=status,
         beispiel=beispiel,
-        dienste=_beispiele(app) if beispiel else _dienste(app),
+        dienste=[k for k in karten if k["zustand"] != "ignoriert"],
+        ignoriert=[k for k in karten if k["zustand"] == "ignoriert"],
+        kartenfehler=kartenfehler or {}, ok=request.query.get("ok", ""),
         module=[s for s in module.stand(app[K_DB], app[K_ABLAGE]) if not s.modul.kern],
         docker=await _docker_stand(app),
+        erkundung={"laeuft": erk.laeuft, "text": erk.text, "prozent": int(erk.anteil * 100), "fehler": erk.fehler},
+        letzte=None if beispiel else letzte(app[K_DB]),
     )
+
+
+async def erkundung_start(request: web.Request) -> web.Response:
+    request.app[K_ERK].starten()
+    raise web.HTTPSeeOther("/onboarding")
+
+
+def _dienst(request: web.Request) -> dict:
+    try:
+        nummer = int(request.match_info["id"])
+    except ValueError:
+        raise web.HTTPNotFound()
+    for d in _dienste(request.app):
+        if d["id"] == nummer:
+            return d
+    raise web.HTTPNotFound()
+
+
+def _schluessel_loeschen(app: web.Application, nummer: int) -> None:
+    for name in app[K_ABLAGE].namen():
+        if name.startswith(f"dienst:{nummer}:"):
+            app[K_ABLAGE].loeschen(name)
+
+
+async def dienst_verbinden(request: web.Request) -> web.Response:
+    app, d = request.app, _dienst(request)
+    e = katalog.eintrag(d["details"].get("kennung", ""))
+    if e is None:
+        raise web.HTTPNotFound()
+    daten = await request.post()
+    werte = {f.name: str(daten.get(f.name, "")).strip() for f in e.felder}
+    if any(not w for w in werte.values()):
+        return await onboarding(request, 400, {d["id"]: "Bitte alle Felder ausfüllen."})
+    in_ordnung, meldung = await verbinden.pruefen(e, d["adresse"], werte)
+    if not in_ordnung:
+        return await onboarding(request, 400, {d["id"]: meldung})
+    for name, wert in werte.items():
+        app[K_ABLAGE].setzen(module.schluesselname(d["id"], name), wert)
+    app[K_DB].ausfuehren("UPDATE dienst SET zustand='verbunden' WHERE id=?", (d["id"],))
+    raise web.HTTPSeeOther(f"/onboarding?ok={d['id']}#dienst-{d['id']}")
+
+
+async def dienst_zustand(request: web.Request) -> web.Response:
+    """Trennen, ignorieren oder wieder zeigen. Beim Trennen und Ignorieren werden die Schlüssel gelöscht."""
+    d, was = _dienst(request), request.match_info["was"]
+    neu = {"trennen": "gefunden", "ignorieren": "ignoriert", "zeigen": "gefunden"}[was]
+    if was != "zeigen":
+        _schluessel_loeschen(request.app, d["id"])
+    request.app[K_DB].ausfuehren("UPDATE dienst SET zustand=? WHERE id=?", (neu, d["id"]))
+    raise web.HTTPSeeOther("/onboarding")
+
+
+def _netzplan(app: web.Application) -> dict:
+    db, stand = app[K_DB], letzte(app[K_DB]) or {}
+    dienste: dict[str, list[dict]] = {}
+    for k, d in zip(_karten(app), _dienste(app)):
+        if k["zustand"] != "ignoriert":
+            dienste.setdefault(d["details"].get("ip", ""), []).append(k)
+    eigene, router = set(stand.get("eigene") or []), stand.get("router")
+    geraete = []
+    for z in db.alle("SELECT ip, name, mac, ports, sonstiges FROM geraet"):
+        ip = z["ip"]
+        geraete.append({
+            "ip": ip, "name": z["name"], "mac": z["mac"], "ports": json.loads(z["ports"]),
+            "dienste": dienste.get(ip, []), "sonstiges": json.loads(z["sonstiges"]),
+            "rolle": "Router" if ip == router else "Dieser Rechner" if ip in eigene else "",
+        })
+    geraete.sort(key=lambda g: (g["rolle"] != "Router", g["rolle"] != "Dieser Rechner", not g["dienste"], int(ipaddress.IPv4Address(g["ip"]))))
+    container = [{**dict(z), "ports": json.loads(z["ports"])} for z in db.alle("SELECT name, image, zustand, ports, stack FROM container ORDER BY stack, name")]
+    return {"geraete": geraete, "container": container, "stand": stand, "router": router}
 
 
 async def modulseite(request: web.Request) -> web.Response:
     kennung = request.match_info["id"]
     for s in module.stand(request.app[K_DB], request.app[K_ABLAGE]):
         if s.modul.id == kennung and s.aktiv and not s.modul.kern:
+            if kennung == "netzplan":
+                return _seite(request, "netzplan.html", modul=s.modul, **_netzplan(request.app))
             return _seite(request, "modul.html", modul=s.modul)
     raise web.HTTPNotFound(text="Dieses Modul ist nicht aktiv.")
 
@@ -251,13 +351,24 @@ async def api_dienste(request: web.Request) -> web.Response:
     return web.json_response(_dienste(request.app))
 
 
-def app_bauen(einst: Einstellungen) -> web.Application:
+async def api_erkundung(request: web.Request) -> web.Response:
+    erk = request.app[K_ERK]
+    return web.json_response({"laeuft": erk.laeuft, "text": erk.text, "anteil": erk.anteil, "fehler": erk.fehler,
+                              "letzte": letzte(request.app[K_DB])})
+
+
+async def api_netzplan(request: web.Request) -> web.Response:
+    return web.json_response(_netzplan(request.app), dumps=lambda o: json.dumps(o, default=lambda x: x.__dict__))
+
+
+def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, erkundung_ports: tuple[int, ...] | None = None) -> web.Application:
     app = web.Application(middlewares=[kopfzeilen, herkunft, torwaechter], client_max_size=64 * 1024)
     db = Datenbank(einst.datenbank)
     app[K_EINST] = einst
     app[K_DB] = db
     app[K_ANM] = Anmeldung(db, einst.sitzung_tage)
     app[K_ABLAGE] = Ablage(db, einst.daten, einst.hauptschluessel)
+    app[K_ERK] = Erkundung(db, einst.docker_url, erkundung_ziele, erkundung_ports)
     app[K_JINJA] = jinja2.Environment(
         loader=jinja2.FileSystemLoader(PAKET / "templates"), autoescape=True, trim_blocks=True, lstrip_blocks=True
     )
@@ -271,6 +382,11 @@ def app_bauen(einst: Einstellungen) -> web.Application:
         web.get("/api/zustand", api_zustand),
         web.get("/api/module", api_module),
         web.get("/api/dienste", api_dienste),
+        web.get("/api/erkundung", api_erkundung),
+        web.get("/api/netzplan", api_netzplan),
+        web.post("/erkundung/start", erkundung_start),
+        web.post("/dienst/{id}/verbinden", dienst_verbinden),
+        web.post("/dienst/{id}/{was:trennen|ignorieren|zeigen}", dienst_zustand),
         web.static("/static", PAKET / "static"),
     ])
 

@@ -69,7 +69,7 @@ MODULE: tuple[Modul, ...] = (
     ),
     Modul(
         "netzplan", "Netzplan", "Alle Geräte und Dienste im Heimnetz als Plan.",
-        (Bedarf("*", "mindestens ein gefundener Dienst (nach der ersten Erkundung)", zustand="gefunden"),), farbe="#c77dff",
+        (Bedarf("*", "mindestens ein gefundenes Gerät (nach der ersten Erkundung)", zustand="gefunden"),), farbe="#c77dff",
     ),
 )
 
@@ -80,6 +80,7 @@ def schluesselname(dienst_id: int, schluessel: str) -> str:
 
 def stand(db: Datenbank, ablage: Ablage) -> list[ModulStand]:
     dienste = db.alle("SELECT id, art, zustand FROM dienst WHERE zustand != 'ignoriert'")
+    geraete = db.eine("SELECT COUNT(*) AS n FROM geraet")["n"]
     ergebnis = []
     for m in MODULE:
         fehlt: list[str] = []
@@ -93,7 +94,7 @@ def stand(db: Datenbank, ablage: Ablage) -> list[ModulStand]:
                     fehlt.append(f"Gefunden, aber noch nicht verbunden: {b.bezeichnung}.")
                 elif not any(all(ablage.hat(schluesselname(d["id"], s)) for s in b.schluessel) for d in verbunden):
                     fehlt.append(f"Schlüssel fehlt für: {b.bezeichnung}.")
-            elif not passend:
+            elif not passend and not (b.art == "*" and geraete):
                 fehlt.append(f"Noch nicht vorhanden: {b.bezeichnung}.")
         ergebnis.append(ModulStand(m, aktiv=m.kern or not fehlt, fehlt=fehlt))
     return ergebnis

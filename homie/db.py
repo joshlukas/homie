@@ -29,6 +29,25 @@ CREATE TABLE IF NOT EXISTS dienst (
     gefunden INTEGER NOT NULL,
     details TEXT NOT NULL DEFAULT '{}'
 );
+CREATE TABLE IF NOT EXISTS geraet (             -- Ergebnis der letzten Erkundung: Geräte im Heimnetz
+    ip TEXT PRIMARY KEY,
+    name TEXT NOT NULL DEFAULT '',
+    mac TEXT NOT NULL DEFAULT '',
+    ports TEXT NOT NULL DEFAULT '[]',
+    sonstiges TEXT NOT NULL DEFAULT '[]',       -- unbekannte Webseiten und einfache Dienste auf dem Gerät
+    gesehen INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS container (          -- Docker-Container auf diesem Rechner (nur gelesen)
+    name TEXT PRIMARY KEY,
+    image TEXT NOT NULL DEFAULT '',
+    zustand TEXT NOT NULL DEFAULT '',
+    ports TEXT NOT NULL DEFAULT '[]',
+    stack TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS merk (
+    name TEXT PRIMARY KEY,
+    wert TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS ablage (
     name TEXT PRIMARY KEY,             -- z. B. dienst:3:token
     nonce BLOB NOT NULL,

@@ -1,44 +1,115 @@
 {% extends "basis.html" %}
 {% block titel %}Homie – Onboarding{% endblock %}
+{% block kopf %}{% if erkundung.laeuft %}<meta http-equiv="refresh" content="2">{% endif %}{% endblock %}
 {% block inhalt %}
 <section class="kopf">
   <h1>Onboarding</h1>
   <p class="leiser">Hier lernt Homie dein Heimnetz kennen. Gefundene Dienste erscheinen als Karten; du verbindest sie mit je einem Schlüssel, und das passende Modul schaltet sich ein.</p>
 </section>
 
+{% set verbunden = dienste | selectattr('zustand', 'equalto', 'verbunden') | list %}
 <ol class="schritte" aria-label="Ablauf">
   <li class="fertig"><b>1</b><span>Passwort angelegt</span></li>
-  <li{% if dienste and not beispiel %} class="fertig"{% endif %}><b>2</b><span>Heimnetz erkunden</span></li>
-  <li><b>3</b><span>Dienste verbinden</span></li>
-  <li><b>4</b><span>Module nutzen</span></li>
+  <li{% if letzte %} class="fertig"{% endif %}><b>2</b><span>Heimnetz erkunden</span></li>
+  <li{% if verbunden and not beispiel %} class="fertig"{% endif %}><b>3</b><span>Dienste verbinden</span></li>
+  <li{% if module | selectattr('aktiv') | list %} class="fertig"{% endif %}><b>4</b><span>Module nutzen</span></li>
 </ol>
 
-<h2 class="gruppe"><span>Gefundene Dienste</span></h2>
+<h2 class="gruppe"><span>Erkundung</span></h2>
 {% if beispiel %}
 <p class="glas hinweis"><b>Beispielansicht.</b> Diese Karten sind erfunden und zeigen nur, wie es später aussieht. <a href="/onboarding">Zurück zum echten Stand</a></p>
-{% endif %}
-{% if dienste %}
-<div class="raster">
-  {% for d in dienste %}
-  <article class="glas karte" style="--c: {{ d.farbe or '#8b7cff' }}">
-    <header><h3>{{ d.name }}</h3><span class="chip {{ d.zustand }}">{{ d.zustand }}</span></header>
-    <p class="leiser">{{ d.details.beschreibung or d.art }}</p>
-    {% if d.adresse %}<p class="adresse">{{ d.adresse }}</p>{% endif %}
-    {% if d.details.braucht %}<p class="braucht">Braucht: {{ d.details.braucht }}</p>{% endif %}
-    {% if d.details.schaltet_frei %}<p class="braucht">Schaltet frei: {{ d.details.schaltet_frei }}</p>{% endif %}
-    <button type="button" disabled>{{ 'Verbunden' if d.zustand == 'verbunden' else 'Verbinden' }}</button>
-  </article>
-  {% endfor %}
+{% elif erkundung.laeuft %}
+<div class="glas leer" role="status">
+  <h3>Homie erkundet dein Heimnetz …</h3>
+  <p class="leiser">{{ erkundung.text }}</p>
+  <div class="balken"><i style="width: {{ erkundung.prozent }}%"></i></div>
+  <p class="leiser klein">Dauert meist unter einer Minute. Die Seite aktualisiert sich von selbst.</p>
 </div>
 {% else %}
 <div class="glas leer">
+  {% if erkundung.fehler %}<p class="meldung" role="alert">{{ erkundung.fehler }}</p>{% endif %}
+  {% if letzte %}
+  <h3>{{ letzte.geraete }} Geräte, {{ letzte.dienste }} bekannte Dienste{% if letzte.docker == 'bereit' %}, {{ letzte.container }} Container{% endif %}</h3>
+  <p class="leiser">Stand der letzten Erkundung.{% if letzte.neu %} Neu dabei: {{ letzte.neu }}.{% endif %} Du kannst sie jederzeit wiederholen, zum Beispiel nachdem du einen neuen Dienst aufgesetzt hast.</p>
+  {% else %}
   <h3>Noch nichts gefunden</h3>
-  <p class="leiser">Homie hat dein Heimnetz noch nicht erkundet. Die Erkundung liest nur – sie ändert nichts – und kommt mit dem nächsten Ausbauschritt.</p>
+  <p class="leiser">Homie sieht sich in deinem Heimnetz um: welche Geräte antworten, welche bekannten Dienste darauf laufen und welche Container Docker hier betreibt. Dabei wird nur gelesen – Homie meldet sich nirgends an und ändert nichts.</p>
+  {% endif %}
   <div class="knoepfe">
-    <button type="button" disabled>Heimnetz erkunden (folgt)</button>
-    <a class="knopf leise" href="/onboarding?beispiel=1">Beispiel ansehen</a>
+    <form method="post" action="/erkundung/start">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button type="submit">{{ 'Erneut erkunden' if letzte else 'Heimnetz erkunden' }}</button>
+    </form>
+    {% if not letzte %}<a class="knopf leise" href="/onboarding?beispiel=1">Beispiel ansehen</a>{% endif %}
   </div>
 </div>
+{% endif %}
+
+{% if dienste %}
+<h2 class="gruppe"><span>Gefundene Dienste</span></h2>
+<div class="raster">
+  {% for d in dienste %}
+  <article class="glas karte" id="dienst-{{ d.id }}" style="--c: {{ d.farbe }}">
+    <header><h3>{{ d.name }}</h3><span class="chip {{ d.zustand }}">{{ d.zustand }}</span></header>
+    <p class="leiser">{{ d.beschreibung }}{% if d.geraet %} · auf {{ d.geraet }}{% endif %}</p>
+    {% if d.adresse %}<p class="adresse">{% if beispiel %}{{ d.adresse }}{% else %}<a href="{{ d.adresse }}" target="_blank" rel="noopener noreferrer">{{ d.adresse }}</a>{% endif %}</p>{% endif %}
+    {% if d.vermisst %}<p class="braucht warnung">Bei der letzten Erkundung nicht mehr erreichbar.</p>{% endif %}
+    {% if d.schaltet_frei %}<p class="braucht">Schaltet frei: {{ d.schaltet_frei }}</p>{% endif %}
+    {% if kartenfehler.get(d.id) %}<p class="meldung" role="alert">{{ kartenfehler[d.id] }}</p>{% endif %}
+    {% if ok == d.id | string %}<p class="meldung gut" role="status">Verbunden.</p>{% endif %}
+    {% if beispiel %}
+      <p class="braucht">Braucht: {{ d.braucht }}</p>
+      <button type="button" disabled>{{ 'Verbunden' if d.zustand == 'verbunden' else 'Verbinden' }}</button>
+    {% elif d.zustand == 'verbunden' %}
+      <form method="post" action="/dienst/{{ d.id }}/trennen" class="unten">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="leise">Trennen{% if d.felder %} und Schlüssel löschen{% endif %}</button>
+      </form>
+    {% else %}
+      {% if d.felder %}
+      <details class="eingabe"{% if kartenfehler.get(d.id) %} open{% endif %}>
+        <summary class="knopf">Verbinden</summary>
+        <form method="post" action="/dienst/{{ d.id }}/verbinden" autocomplete="off">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          {% for f in d.felder %}
+          <label for="f-{{ d.id }}-{{ f.name }}">{{ f.titel }}</label>
+          <input id="f-{{ d.id }}-{{ f.name }}" name="{{ f.name }}" type="{{ 'password' if f.geheim else 'text' }}" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+          {% if f.hinweis %}<small>{{ f.hinweis }}</small>{% endif %}
+          {% endfor %}
+          <small>Homie prüft den Schlüssel mit einem lesenden Aufruf bei {{ d.name }} und legt ihn dann verschlüsselt ab.</small>
+          <button type="submit">Prüfen und verbinden</button>
+        </form>
+      </details>
+      {% else %}
+      <form method="post" action="/dienst/{{ d.id }}/verbinden" class="unten">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit">Verbinden</button>
+        <small>Braucht keinen Schlüssel.</small>
+      </form>
+      {% endif %}
+      <form method="post" action="/dienst/{{ d.id }}/ignorieren">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit" class="text">Nicht anzeigen</button>
+      </form>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if ignoriert %}
+<details class="mehr">
+  <summary>Ausgeblendet: {{ ignoriert | length }}</summary>
+  <div class="liste">
+    {% for d in ignoriert %}
+    <form method="post" action="/dienst/{{ d.id }}/zeigen" class="zeile">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <span>{{ d.name }}{% if d.geraet %} · {{ d.geraet }}{% endif %}</span>
+      <button type="submit" class="text">Wieder anzeigen</button>
+    </form>
+    {% endfor %}
+  </div>
+</details>
 {% endif %}
 
 <h2 class="gruppe"><span>Module</span></h2>
@@ -48,7 +119,7 @@
     <header><h3>{{ s.modul.titel }}</h3><span class="chip {{ 'verbunden' if s.aktiv else 'wartet' }}">{{ 'aktiv' if s.aktiv else 'wartet' }}</span></header>
     <p class="leiser">{{ s.modul.beschreibung }}</p>
     {% if s.aktiv %}
-    <a class="knopf" href="/m/{{ s.modul.id }}">Öffnen</a>
+    <a class="knopf unten" href="/m/{{ s.modul.id }}">Öffnen</a>
     {% else %}
     <ul class="fehlt">{% for f in s.fehlt %}<li>{{ f }}</li>{% endfor %}</ul>
     {% endif %}

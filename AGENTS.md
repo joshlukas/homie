@@ -28,6 +28,9 @@ Homie braucht keinen Agenten: Installation und Einrichtung laufen über die READ
 | `homie/anmeldung.py` | Konto, Passwort-Prüfwert (scrypt), Sitzungen |
 | `homie/ablage.py` | verschlüsselte Ablage für Schlüssel (AES-256-GCM) |
 | `homie/module.py` | Modul-Register: was jedes Modul braucht |
+| `homie/katalog.py` | bekannte Dienste: Erkennungsmerkmal, nötige Schlüssel, was sie freischalten |
+| `homie/erkundung.py` | Erkundung des Heimnetzes, nur lesend |
+| `homie/verbinden.py` | Schlüssel beim Dienst prüfen, bevor er abgelegt wird |
 | `homie/db.py`, `homie/config.py` | Datenbank im Datenordner, Einstellungen |
 | `tests/` | `python -m unittest discover -s tests -v` muss vor jeder Änderung und danach grün sein |
 

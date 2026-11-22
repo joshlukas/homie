@@ -139,3 +139,46 @@ body.tor main { display: grid; place-items: center; }
   .raster { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---------- Etappe 1: Erkundung, Verbinden, Netzplan ---------- */
+.klein { font-size: 12.5px; }
+.balken { height: 8px; margin: 16px 0 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.balken i { display: block; height: 100%; min-width: 4%; border-radius: 999px; background: var(--g-brand); transition: width 0.6s; }
+.knoepfe form { margin: 0; }
+.karte form { margin: 0; }
+.karte .unten, .karte .eingabe { margin-top: auto; }
+.karte .unten small { margin-top: 8px; }
+.karte .adresse a { color: inherit; }
+.karte .warnung { color: var(--warn); }
+.meldung.gut { background: rgba(61, 220, 151, 0.12); border-color: rgba(61, 220, 151, 0.35); color: #b9f5dc; margin-top: 2px; }
+button.text { min-height: 0; padding: 4px 0; background: none; box-shadow: none; color: var(--faint); font-weight: 500; font-size: 13px; text-decoration: underline; }
+button.text:hover { color: var(--text); transform: none; }
+details.eingabe > summary { list-style: none; display: inline-flex; }
+details.eingabe > summary::-webkit-details-marker { display: none; }
+details.eingabe[open] > summary { background: rgba(255, 255, 255, 0.07); border: 1px solid var(--glas-kante); box-shadow: none; }
+details.eingabe form { margin-top: 4px; }
+details.eingabe form button { margin-top: 16px; }
+details.mehr { margin-top: 14px; color: var(--muted); }
+details.mehr > summary { cursor: pointer; font-size: 13.5px; padding: 6px 2px; }
+details.mehr .liste { padding: 0; margin-top: 6px; }
+.zeile { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 2px; border-top: 1px solid rgba(150, 160, 255, 0.12); margin: 0; }
+
+.plan { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 12px; }
+.plan .knoten { grid-column: 1 / -1; justify-self: center; padding: 8px 20px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); border: 1px dashed var(--glas-kante); color: var(--muted); font-size: 13px; }
+.plan .strang { grid-column: 1 / -1; justify-self: center; width: 2px; height: 18px; margin: -6px 0; background: linear-gradient(180deg, rgba(150, 160, 255, 0.5), rgba(150, 160, 255, 0.1)); }
+.geraet { padding: 16px 18px 14px; min-width: 0; }
+.geraet.rolle { border-color: rgba(139, 124, 255, 0.5); }
+.geraet header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.geraet h3 { overflow-wrap: anywhere; }
+.geraet .adresse { margin-top: 4px; font: 12.5px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--faint); overflow-wrap: anywhere; }
+.dienste { list-style: none; margin: 10px 0 0; padding: 0; }
+.dienste li { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; padding: 7px 0; border-top: 1px solid rgba(150, 160, 255, 0.12); font-size: 14px; }
+.dienste li i { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--c, var(--faint)); box-shadow: 0 0 0 4px color-mix(in srgb, var(--c, var(--faint)) 20%, transparent); }
+.dienste li i.an { background: var(--good); box-shadow: none; }
+.dienste li i.aus { background: var(--faint); box-shadow: none; }
+.dienste li.neben { color: var(--muted); }
+.dienste li small { margin: 0 0 0 auto; }
+.dienste a { color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
+.dienste a:hover { text-decoration: underline; }
+details.container { margin-top: 10px; }
+details.container > summary { cursor: pointer; color: var(--muted); font-size: 13.5px; }

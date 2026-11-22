@@ -1,0 +1,46 @@
+{% extends "basis.html" %}
+{% block titel %}Homie – Netzplan{% endblock %}
+{% block inhalt %}
+<section class="kopf">
+  <h1>Netzplan</h1>
+  <p class="leiser">{{ geraete | length }} Geräte aus der letzten Erkundung. Gezeigt wird, was im Heimnetz auf bekannten Ports geantwortet hat – Geräte ohne solche Dienste (Handys, Lampen) tauchen hier noch nicht auf. <a href="/onboarding">Erneut erkunden</a></p>
+</section>
+
+<div class="plan">
+  <div class="knoten wolke"><b>Internet</b></div>
+  <div class="strang" aria-hidden="true"></div>
+  {% for g in geraete %}
+  <article class="glas geraet{% if g.rolle %} rolle{% endif %}">
+    <header>
+      <h3>{{ g.name or g.ip }}</h3>
+      {% if g.rolle %}<span class="chip verbunden">{{ g.rolle }}</span>{% endif %}
+    </header>
+    <p class="adresse">{{ g.ip }}{% if g.mac %} · {{ g.mac }}{% endif %}</p>
+    {% if g.dienste or g.sonstiges %}
+    <ul class="dienste">
+      {% for d in g.dienste %}
+      <li style="--c: {{ d.farbe }}"><i></i><a href="{{ d.adresse }}" target="_blank" rel="noopener noreferrer">{{ d.name }}</a>{% if d.zustand == 'verbunden' %}<span class="chip verbunden">verbunden</span>{% endif %}</li>
+      {% endfor %}
+      {% for s in g.sonstiges %}
+      <li class="neben"><i></i>{% if s.adresse %}<a href="{{ s.adresse }}" target="_blank" rel="noopener noreferrer">{{ s.name }}</a>{% else %}{{ s.name }}{% endif %}<small>Port {{ s.port }}</small></li>
+      {% endfor %}
+    </ul>
+    {% elif g.ports %}
+    <p class="leiser klein">Offene Ports: {{ g.ports | join(', ') }}</p>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>
+
+{% if container %}
+<h2 class="gruppe"><span>Docker auf diesem Rechner</span></h2>
+<div class="glas geraet">
+  <p class="leiser klein">{{ container | length }} Container, über den nur lesenden Zwischendienst gelesen.</p>
+  <ul class="dienste">
+    {% for c in container %}
+    <li class="neben"><i class="{{ 'an' if c.zustand == 'running' else 'aus' }}"></i>{{ c.name }}<small>{% if c.stack %}{{ c.stack }} · {% endif %}{{ c.zustand }}{% if c.ports %} · Port {{ c.ports | join(', ') }}{% endif %}</small></li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endblock %}

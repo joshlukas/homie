@@ -8,6 +8,7 @@
 <title>{% block titel %}Homie{% endblock %}</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/homie.css">
+{% block kopf %}{% endblock %}
 </head>
 <body class="{% block koerper %}{% endblock %}">
 {% if csrf %}

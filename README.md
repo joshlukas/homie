@@ -2,7 +2,7 @@
 
 Ein Dashboard fürs Heimnetz, das sich selbst aufbaut: Homie erkundet dein Netz (nur lesend), zeigt gefundene Dienste als Karten, und sobald du einen Dienst verbindest, schaltet sich das passende Modul ein – Tagesüberblick, Aufnahme mit lokaler KI, Gesundheit, Finanzen, Dokumente, Netzplan.
 
-**Stand: Etappe 0 – das Grundgerüst.** Installation, Passwort, Anmeldung, Modul-Register, verschlüsselte Schlüssel-Ablage und ein noch leeres Onboarding. Die Erkundung folgt in Etappe 1.
+**Stand: Etappe 1.** Installation, Anmeldung, Erkundung des Heimnetzes, Verbinden gefundener Dienste mit geprüften Schlüsseln und ein erster Netzplan. Die Inhalte der einzelnen Module folgen in Etappe 2.
 
 Homie ist für das Heimnetz gedacht. Bitte nicht ins Internet freigeben.
 
@@ -51,6 +51,19 @@ Eine Sicherung von Homie ist eine Sicherung dieses Volumes. Wer das Volume samt 
 - **docker-lesen** – ein Zwischendienst, der Homie einen *nur lesenden* Blick auf Docker gibt (welche Container laufen). Homie bekommt den Docker-Zugang nie direkt, und der Zwischendienst ist nur auf dem Rechner selbst erreichbar. Abschalten mit `HOMIE_DOCKER_LESEN=0`.
 
 Einstellungen sind freiwillig; alle stehen mit Erklärung in [.env.example](.env.example). Auf Docker Desktop (Windows/Mac) funktioniert das Heimnetz des Rechners anders – vorgesehen ist ein Linux-Rechner.
+
+## Die Erkundung
+
+Ein Klick auf *Heimnetz erkunden* im Onboarding – nie von selbst. Homie liest dabei nur:
+
+1. **Eigenes Netz bestimmen:** nur private Adressbereiche, höchstens 254 Adressen um die eigene.
+2. **Ports prüfen:** bei jeder Adresse ein Verbindungsversuch auf rund zwei Dutzend bekannten Ports. Drucker- und SSH-Ports sind ausgenommen.
+3. **Dienste erkennen:** offene Web-Ports werden einmal abgerufen; im Katalog ([homie/katalog.py](homie/katalog.py)) steht, woran ein Dienst zu erkennen ist. Weiterleitungen aus dem Heimnetz hinaus werden nicht verfolgt.
+4. **Docker lesen:** welche Container auf diesem Rechner laufen, über den nur lesenden Zwischendienst.
+
+Homie meldet sich dabei nirgends an und ändert nichts. Das Ergebnis liegt ausschließlich im Datenordner.
+
+**Verbinden:** Auf der Karte eines Dienstes trägst du seinen Schlüssel ein. Homie prüft ihn mit einem einzigen lesenden Aufruf bei genau diesem Dienst und legt ihn erst dann verschlüsselt ab. *Trennen* löscht ihn wieder.
 
 ## Module
 
