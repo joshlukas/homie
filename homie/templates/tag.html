@@ -1,65 +1,32 @@
-{% extends "basis.html" %}
-{% block titel %}Homie – Mein Tag{% endblock %}
-{% block inhalt %}
-{% if fehler %}
-<section class="kopf"><h1>Mein Tag</h1></section>
-<div class="glas leer"><h3>Gerade kein Überblick</h3><p class="meldung" role="alert">{{ fehler }}</p></div>
-{% else %}
-<section class="kopf">
-  <h1>{{ daten.gruss }}</h1>
-  <p class="leiser">{{ daten.datum }}</p>
-</section>
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121530">
+<meta name="robots" content="noindex, nofollow">
+<title>Homie – Mein Tag</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/mein-tag.css">
+<script src="/static/mein-tag.js" defer></script>
+</head>
+<body data-csrf="{{ csrf }}">
+<nav class="menue" aria-label="Hauptmenü"><a class="marke" href="/"><i></i><span>Homie</span></a><div class="tabs">
+{%- for m in menue %}<a href="{{ m.pfad }}"{% if pfad == m.pfad %} aria-current="page"{% endif %}>{{ m.titel }}</a>{% endfor %}
+{%- for s in eigene_seiten %}<a href="/s/{{ s.id }}">{{ s.titel }}</a>{% endfor %}</div>
+<form method="post" action="/logout" class="abmelden"><input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit">Abmelden</button></form></nav>
 
-<div class="kacheln">
-  <div class="glas kachel"><b>{{ daten.heute_anzahl }}</b><span>{{ 'Termin heute' if daten.heute_anzahl == 1 else 'Termine heute' }}</span></div>
-  <div class="glas kachel"><b>{{ daten.aufgaben_offen }}</b><span>{{ 'offene Aufgabe' if daten.aufgaben_offen == 1 else 'offene Aufgaben' }}</span></div>
-  {% if daten.wetter %}
-  <div class="glas kachel"><b>{% if daten.wetter.grad is not none %}{{ daten.wetter.grad | round | int }} {{ daten.wetter.einheit }}{% else %}–{% endif %}</b><span>{{ daten.wetter.lage }}{% if daten.wetter.feuchte is not none %} · {{ daten.wetter.feuchte | round | int }} % Luftfeuchte{% endif %}</span></div>
-  {% endif %}
-</div>
-
-<div class="spalten">
-  <section>
-    <h2 class="gruppe"><span>Termine</span></h2>
-    {% if daten.tage %}
-    {% for t in daten.tage %}
-    <div class="glas tagkarte{% if t.heute %} heute{% endif %}">
-      <h3>{{ t.name }}</h3>
-      <ul class="termine">
-        {% for e in t.termine %}
-        <li{% if e.vorbei %} class="vorbei"{% endif %}>
-          <time>{{ e.zeit }}</time>
-          <div><b>{{ e.titel }}</b>{% if e.ort %}<small>{{ e.ort }}</small>{% endif %}</div>
-        </li>
-        {% endfor %}
-      </ul>
-    </div>
-    {% endfor %}
-    {% else %}
-    <div class="glas leer"><h3>Nichts geplant</h3><p class="leiser">{% if daten.kalender %}In den nächsten {{ daten.spanne }} Tagen steht nichts im Kalender.{% else %}Home Assistant kennt noch keinen Kalender. Richte dort einen ein (zum Beispiel über CalDAV), dann erscheinen die Termine hier.{% endif %}</p></div>
-    {% endif %}
-  </section>
-
-  <section>
-    <h2 class="gruppe"><span>Aufgaben</span></h2>
-    {% if daten.aufgaben %}
-    {% for a in daten.aufgaben %}
-    <div class="glas tagkarte">
-      <h3>{{ a.name }} <span class="chip">{{ a.offen }} offen</span></h3>
-      {% if a.punkte %}
-      <ul class="aufgaben">
-        {% for p in a.punkte %}<li><i></i><span>{{ p.titel }}</span>{% if p.faellig %}<small class="{{ 'spaet' if p.faellig == 'überfällig' }}">{{ p.faellig }}</small>{% endif %}</li>{% endfor %}
-      </ul>
-      {% if a.offen > a.punkte | length %}<p class="leiser klein">und {{ a.offen - a.punkte | length }} weitere</p>{% endif %}
-      {% elif a.offen == 0 %}
-      <p class="leiser klein">Alles erledigt.</p>
-      {% endif %}
-    </div>
-    {% endfor %}
-    {% else %}
-    <div class="glas leer"><h3>Keine Aufgabenliste</h3><p class="leiser">Home Assistant kennt noch keine Aufgabenliste.</p></div>
-    {% endif %}
-  </section>
-</div>
-{% endif %}
-{% endblock %}
+<header>
+  <div><h1>Mein Tag</h1><p id="sub">Lade …</p></div>
+  <span class="spacer"></span>
+  <div class="seg" role="group" aria-label="Zeitraum">
+    <button data-d="1">Heute</button><button data-d="7" aria-pressed="true">7 Tage</button><button data-d="30">30 Tage</button><button data-d="90">90 Tage</button>
+  </div>
+</header>
+<main>
+  <div id="errors"></div>
+  <section class="tiles" id="tiles"></section>
+  <section class="grid" id="grid"></section>
+</main>
+</body>
+</html>

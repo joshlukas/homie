@@ -4,6 +4,7 @@ Es wird nur 127.0.0.1 abgefragt; kein echtes Netz, keine echten Dienste.
 """
 import datetime as dt
 import ipaddress
+import json
 import pathlib
 import secrets
 import tempfile
@@ -12,7 +13,7 @@ import unittest
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
-from homie import erkundung, katalog, module
+from homie import erkundung, katalog, meintag, module
 from homie.config import laden
 from homie.server import K_ABLAGE, K_DB, K_ERK, app_bauen
 
@@ -320,11 +321,25 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         r = await self.c.get("/m/tag")
         text = await r.text()
         self.assertEqual(r.status, 200)
-        for erwartet in ("Heute", "Zahnarzt", "23:30–23:50", "Praxis am Markt", "Morgen", "Geburtstag Oma", "ganztägig",
-                         "Einkauf", "2 offen", "Milch", "Paket abholen", "überfällig", "teils bewölkt", "7 °C", "81 % Luftfeuchte"):
+        for erwartet in ("/static/mein-tag.js", "/static/mein-tag.css", 'id="tiles"', "data-csrf=", 'href="/m/tag" aria-current="page"', "Abmelden"):
             self.assertIn(erwartet, text)
+        self.assertIn("img-src 'self' data: https:", r.headers["Content-Security-Policy"])
         self.assertNotIn(GUT, text)
-        self.assertLess(text.index("Zahnarzt"), text.index("Geburtstag Oma"))
+        for datei in ("mein-tag.js", "mein-tag.css"):
+            r = await self.c.get(f"/static/{datei}")
+            self.assertEqual(r.status, 200)
+            self.assertNotIn("googleapis", await r.text())          # nichts von außen
+        # der eine Abruf, aus dem die Seite alles zeichnet
+        d = await (await self.c.get("/api/tag?tage=7")).json()
+        self.assertEqual([t["titel"] for t in d["kalender"]["termine"]], ["Zahnarzt", "Geburtstag Oma"])
+        self.assertEqual((d["kalender"]["termine"][1]["ganztags"], d["kalender"]["kalender"]), (True, ["Privat"]))
+        self.assertEqual(d["gesundheit"]["aktuell"]["schritte"]["wert"], 8432)          # der neuere von zwei Sensoren
+        self.assertEqual(d["gesundheit"]["aktuell"]["puls"]["wert"], 61)
+        self.assertNotIn("ruhepuls", d["gesundheit"]["aktuell"])                        # „unknown“ fehlt
+        self.assertEqual((len(d["gesundheit"]["tage"]), d["gesundheit"]["tage"][-1]["schritte"]), (7, 8432))
+        self.assertTrue(any("nicht verbunden" in f for f in d["fehler"]))               # Notiz-Assistent fehlt hier noch
+        self.assertEqual((d["finanzen"], d["yamtrack"], d["eintraege"]), (None, None, []))
+        self.assertNotIn(GUT, json.dumps(d))
         # Gesundheit: Werte der Handy-App, der neuere Sensor gewinnt, Unbekanntes fehlt
         r = await self.c.get("/m/gesundheit")
         text = await r.text()
@@ -333,11 +348,30 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
             self.assertIn(erwartet, text)
         self.assertNotIn("Ruhepuls", text)
         self.assertNotIn(GUT, text)
-        # Schlüssel wird ungültig → verständliche Meldung statt Absturz
+        # mit Notiz-Assistent: Einträge, Finanzen, geteilte Ausgaben, Profil, KI-Kosten und der lange Verlauf kommen dazu
+        await self.c.post("/dienst/neu", data={"csrf": self.csrf, "adresse": f"127.0.0.1:{self.notizdienst}"}, allow_redirects=False)
+        nd = next(x["id"] for x in await (await self.c.get("/api/dienste")).json() if x["name"] == "Notiz-Assistent")
+        await self.c.post(f"/dienst/{nd}/verbinden", data={"csrf": self.csrf, "token": GUT}, allow_redirects=False)
+        self.app[K_DB].ausfuehren("INSERT INTO merk (name, wert) VALUES ('ich', 'Person A')")
+        d = await (await self.c.get("/api/tag?tage=30")).json()
+        self.assertEqual(d["fehler"], [])
+        self.assertEqual((d["ich"], len(d["eintraege"]), d["kategorien"]["notiz"], d["cospend"]["saldo"]["Person A"]), ("Person A", 3, "Notizen", 12.5))
+        self.assertEqual((d["finanzen"]["budget"]["frei"], d["claude"]["heute"]["aufrufe"], d["profil"]["vorschlaege"][0]["id"]), (412.0, 6, 7))
+        self.assertEqual((len(d["gesundheit"]["training"]), len(d["gesundheit"]["training_vorschlaege"]), len(d["gesundheit"]["tage"])), (2, 1, 30))
+        # bestätigen direkt aus der Seite: nur mit Sicherheitsmarke
+        ENTSCHIEDEN.clear()
+        self.assertEqual((await self.c.post("/api/tag/entscheid/training", json={"id": "x", "annehmen": True})).status, 403)
+        r = await self.c.post("/api/tag/entscheid/profil", json={"id": 7, "annehmen": False}, headers={"X-Homie-CSRF": self.csrf})
+        self.assertEqual(await r.json(), {"ok": True})
+        self.assertEqual(ENTSCHIEDEN, [("profil", {"id": 7, "annehmen": False})])
+        # ein Dienst fällt aus → die Seite bekommt den Rest und eine Meldung statt eines Absturzes
         self.app[K_ABLAGE].setzen(module.schluesselname(ha, "token"), "abgelaufen")
-        r = await self.c.get("/m/tag")
-        self.assertEqual(r.status, 502)
-        self.assertIn("lehnt den Schlüssel ab", await r.text())
+        meintag._merker.clear()
+        d = await (await self.c.get("/api/tag")).json()
+        self.assertEqual(len(d["eintraege"]), 3)
+        self.assertTrue(any("Kalender" in f for f in d["fehler"]))
+        self.c.session.cookie_jar.clear()
+        self.assertEqual((await self.c.get("/api/tag")).status, 401)
 
     async def test_notiz_assistent_aufnahme_und_finanzen(self):
         r = await self.c.post("/dienst/neu", data={"csrf": self.csrf, "adresse": f"127.0.0.1:{self.notizdienst}"}, allow_redirects=False)

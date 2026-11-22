@@ -2,6 +2,7 @@
 
 Weitere Befehle (im Container: `docker exec -i homie python -m homie …`):
   passwort-zuruecksetzen             Konto entfernen; im Browser legst du ein neues Passwort an.
+  einstellung ich NAME               Dein Name, so wie er bei den geteilten Ausgaben steht (für „du schuldest / du bekommst“).
   verbinden NAME FELD [FELD …]       Einen Dienst ohne Browser verbinden. Die Werte der Felder werden zeilenweise
         [--adresse URL]              von der Eingabe gelesen – nie als Argument, damit sie in keiner Befehlsliste stehen.
 """
@@ -70,8 +71,16 @@ def main() -> int:
         in_ordnung, meldung = asyncio.run(dienst_verbinden(db, Ablage(db, einst.daten, einst.hauptschluessel), name, felder, werte, adresse))
         print(meldung, file=sys.stdout if in_ordnung else sys.stderr)
         return 0 if in_ordnung else 1
+    if befehl == "einstellung":
+        if len(sys.argv) != 4 or sys.argv[2] not in ("ich",):
+            print("Aufruf: einstellung ich NAME   (dein Name, so wie er bei den geteilten Ausgaben steht)", file=sys.stderr)
+            return 2
+        Datenbank(einst.datenbank).ausfuehren("INSERT INTO merk (name, wert) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET wert=excluded.wert",
+                                              (sys.argv[2], sys.argv[3][:60]))
+        print("Gespeichert.")
+        return 0
     if befehl != "start":
-        print("Unbekannter Befehl. Möglich: start, passwort-zuruecksetzen, verbinden", file=sys.stderr)
+        print("Unbekannter Befehl. Möglich: start, passwort-zuruecksetzen, verbinden, einstellung", file=sys.stderr)
         return 2
     print(f"Homie {VERSION} – Datenordner {einst.daten}, Port {einst.port}", flush=True)
     web.run_app(app_bauen(einst), host=einst.bind, port=einst.port, print=None, access_log=None)

@@ -23,6 +23,9 @@ services:
       TZ: ${TZ:-Europe/Berlin}
     volumes:
       - homie-daten:/data          # alles Private: Konto, Erkanntes, verschlüsselte Schlüssel
+      # Freiwillig, nur wenn Yamtrack auf demselben Rechner läuft: seine Datenbank nur lesbar einhängen,
+      # dann zeigt „Mein Tag“ auch Gesehenes. Den Namen des Volumes zeigt „docker volume ls“.
+      # - yamtrack_db:/yamtrack:ro
     read_only: true
     tmpfs:
       - /tmp

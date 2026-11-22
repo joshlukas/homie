@@ -14,7 +14,7 @@ import jinja2
 from aiohttp import web
 from yarl import URL
 
-from . import agenten, assistent, ausfuehren, dokumente, gesundheit, katalog, module, plaene, proxmox, tag, verbinden
+from . import agenten, assistent, ausfuehren, dokumente, gesundheit, katalog, meintag, module, plaene, proxmox, tag, verbinden
 from .ablage import Ablage
 from .anmeldung import COOKIE, MIN_LAENGE, Anmeldung, passwort_maengel
 from .config import PAKET, VERSION, Einstellungen
@@ -361,13 +361,40 @@ async def _seite_dokumente(request: web.Request, modul: module.Modul) -> web.Res
 
 
 async def _seite_tag(request: web.Request, modul: module.Modul) -> web.Response:
-    zugang = _zugang(request.app, "homeassistant", ("token",))
-    daten, fehler = None, ""
+    """Die Seite selbst ist nur das Gerüst; ihr Inhalt kommt über /api/tag. Bilder dürfen von https-Adressen kommen (Filmplakate)."""
+    antwort = _seite(request, "tag.html", modul=modul)
+    antwort.headers["Content-Security-Policy"] = KOPFZEILEN["Content-Security-Policy"].replace("img-src 'self' data:", "img-src 'self' data: https:")
+    return antwort
+
+
+def _ich(app: web.Application) -> str:
+    z = app[K_DB].eine("SELECT wert FROM merk WHERE name='ich'")
+    return z["wert"] if z else ""
+
+
+async def api_tag(request: web.Request) -> web.Response:
+    app = request.app
     try:
-        daten = await tag.uebersicht(zugang[0], zugang[1]["token"])
-    except tag.TagFehler as e:
-        fehler = str(e)
-    return _seite(request, "tag.html", status=200 if daten else 502, modul=modul, daten=daten, fehler=fehler)
+        tage = int(request.query.get("tage", "7"))
+    except ValueError:
+        tage = 7
+    return web.json_response(await meintag.schnappschuss(
+        _zugang(app, "assistent", ("token",)), _zugang(app, "homeassistant", ("token",)), tage, _ich(app), app[K_EINST].yamtrack),
+        dumps=lambda o: json.dumps(o, ensure_ascii=False))
+
+
+async def api_tag_entscheid(request: web.Request) -> web.Response:
+    zugang = _zugang(request.app, "assistent", ("token",))
+    if zugang is None:
+        return web.json_response({"ok": False, "fehler": "Der Notiz-Assistent ist nicht verbunden."}, status=409)
+    try:
+        daten = await request.json()
+        kennung, annehmen = str(daten["id"])[:80], bool(daten.get("annehmen"))
+    except (ValueError, KeyError, TypeError):
+        return web.json_response({"ok": False, "fehler": "Ungültige Anfrage."}, status=400)
+    in_ordnung, meldung = await assistent.entscheid(zugang[0], zugang[1]["token"], request.match_info["art"], kennung, annehmen)
+    meintag._merker.clear()      # die Seite soll die Änderung sofort zeigen
+    return web.json_response({"ok": in_ordnung, **({} if in_ordnung else {"fehler": meldung})})
 
 
 async def _seite_gesundheit(request: web.Request, modul: module.Modul) -> web.Response:
@@ -733,6 +760,8 @@ def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, er
         web.get("/api/module", api_module),
         web.get("/api/dienste", api_dienste),
         web.get("/api/erkundung", api_erkundung),
+        web.get("/api/tag", api_tag),
+        web.post("/api/tag/entscheid/{art:finanzen|training|profil}", api_tag_entscheid),
         web.get("/api/netzplan", api_netzplan),
         web.post("/erkundung/start", erkundung_start),
         web.post("/dienst/neu", dienst_neu),
