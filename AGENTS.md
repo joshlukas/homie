@@ -8,6 +8,20 @@ Homie braucht keinen Agenten: Installation und Einrichtung laufen über die READ
 2. **Plan zeigen.** Sag in einfachen Worten, was du tun willst, was sich dadurch ändert und wie es rückgängig geht. Warte auf ein Ja.
 3. **Dann bauen.** Nur das Besprochene. Danach prüfen und ehrlich berichten, was geprüft wurde und was nicht.
 
+## Schnittstelle für Agenten
+
+Der Mensch erzeugt im Dashboard unter *Onboarding → Helfende Agenten* einen Schlüssel für dich (`hm_…`). Damit kannst du lesen und Pläne vorschlagen – mehr nicht:
+
+```bash
+curl -H "Authorization: Bearer $HOMIE_AGENT" http://<adresse>:8090/agent            # Regeln und Wege
+curl -H "Authorization: Bearer $HOMIE_AGENT" http://<adresse>:8090/agent/zustand    # Module, Dienste, Pläne
+curl -H "Authorization: Bearer $HOMIE_AGENT" http://<adresse>:8090/agent/rezepte    # was sich planen lässt
+curl -H "Authorization: Bearer $HOMIE_AGENT" -H "Content-Type: application/json" \
+     -d '{"rezept": "docker-vm", "parameter": {"name": "beispiel", "ram_gb": 2}}' http://<adresse>:8090/agent/plaene
+```
+
+Ein vorgeschlagener Plan ist ein Entwurf. Lesen, bestätigen und ausführen kann ihn nur der Mensch im Dashboard. Über diese Schnittstelle bekommst du nie Schlüssel zu sehen, kannst nichts verbinden, nichts erkunden und nichts ändern. Den Schlüssel selbst behandelst du wie jedes Geheimnis: nicht ausgeben, nicht in Dateien des Repositorys schreiben.
+
 ## Schlüssel und Privates
 
 - **Keine Schlüssel im Chat.** Frag nie nach Passwörtern oder Tokens und gib nie welche aus. Der Mensch trägt sie selbst im Dashboard oder in Portainer ein.
@@ -34,6 +48,9 @@ Homie braucht keinen Agenten: Installation und Einrichtung laufen über die READ
 | `homie/tag.py`, `homie/gesundheit.py` | Module Mein Tag und Gesundheit: lesen Home Assistant |
 | `homie/assistent.py` | Module Aufnahme und Finanzen: lesen den Notiz-Assistenten; gibt neue Aufnahmen an ihn ab |
 | `homie/dokumente.py` | Modul Dokumente: liest Paperless-ngx (nur lesend, nichts wird gespeichert) |
+| `homie/proxmox.py` | Proxmox lesen (VMs, Container, Speicher) |
+| `homie/plaene.py` | Pläne entwerfen und prüfen; enthält bewusst keinen schreibenden Aufruf |
+| `homie/agenten.py` | Schlüssel für helfende Agenten, Wege unter `/agent/…` |
 | `homie/db.py`, `homie/config.py` | Datenbank im Datenordner, Einstellungen |
 | `tests/` | `python -m unittest discover -s tests -v` muss vor jeder Änderung und danach grün sein |
 

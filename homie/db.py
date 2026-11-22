@@ -48,6 +48,24 @@ CREATE TABLE IF NOT EXISTS merk (
     name TEXT PRIMARY KEY,
     wert TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS plan (               -- Pläne: erst lesen und bestätigen, dann (später) ausführen
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    rezept TEXT NOT NULL,
+    titel TEXT NOT NULL,
+    parameter TEXT NOT NULL,
+    inhalt TEXT NOT NULL,                       -- Schritte, Prüfung, Grenzen, technische Angaben
+    zustand TEXT NOT NULL DEFAULT 'entwurf',    -- entwurf | verworfen
+    von TEXT NOT NULL DEFAULT '',
+    angelegt INTEGER NOT NULL,
+    geaendert INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS agent (              -- Schlüssel für helfende Agenten, nur als SHA-256
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    kennung TEXT NOT NULL UNIQUE,
+    angelegt INTEGER NOT NULL,
+    zuletzt INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS ablage (
     name TEXT PRIMARY KEY,             -- z. B. dienst:3:token
     nonce BLOB NOT NULL,

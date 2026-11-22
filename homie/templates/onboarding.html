@@ -127,6 +127,64 @@
 </details>
 {% endif %}
 
+{% if not beispiel %}
+<h2 class="gruppe" id="plaene"><span>Pläne</span></h2>
+{% if planfehler %}<p class="meldung" role="alert">{{ planfehler }}</p>{% endif %}
+{% if plaene %}
+<div class="glas liste">
+  {% for p in plaene %}
+  <p><span><a href="/plan/{{ p.id }}">{{ p.titel }}</a> · vorgeschlagen von {{ p.von }}</span><b class="stand {{ 'bereit' if p.machbar else 'fehler' }}">{{ 'Entwurf, machbar' if p.machbar else 'Entwurf, so nicht machbar' }}</b></p>
+  {% endfor %}
+</div>
+{% endif %}
+{% if proxmox_da %}
+<details class="mehr hand"{% if planfehler %} open{% endif %}>
+  <summary>Neue VM planen</summary>
+  {% for r in rezepte %}
+  <form method="post" action="/plan/neu" class="glas leer">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="rezept" value="{{ r.id }}">
+    <h3>{{ r.titel }}</h3>
+    <p class="leiser">{{ r.beschreibung }} Homie sieht auf deinem Proxmox nach, ob das passt, und schreibt einen Plan. Angelegt wird dabei nichts.</p>
+    <label for="plan-name">Name</label>
+    <input id="plan-name" name="name" type="text" placeholder="z. B. dokumente" autocapitalize="off" spellcheck="false" required>
+    <div class="felder">
+      {% for z in r.zahlen %}
+      <div><label for="plan-{{ z.name }}">{{ z.titel }}{% if z.einheit %} ({{ z.einheit }}){% endif %}</label>
+      <input id="plan-{{ z.name }}" name="{{ z.name }}" type="number" min="{{ z.von }}" max="{{ z.bis }}" value="{{ z.standard }}" required></div>
+      {% endfor %}
+    </div>
+    <button type="submit">Plan erstellen</button>
+  </form>
+  {% endfor %}
+</details>
+{% elif not plaene %}
+<div class="glas leer"><p class="leiser">Sobald Proxmox verbunden ist, kann Homie hier Pläne für neue virtuelle Maschinen aufschreiben. Angelegt wird erst etwas, wenn du einen Plan gelesen und bestätigt hast.</p></div>
+{% endif %}
+
+<h2 class="gruppe" id="helfer"><span>Helfende Agenten</span></h2>
+<div class="glas leer">
+  <p class="leiser">Wenn du dir von einem KI-Agenten helfen lässt, bekommt er hier einen eigenen Schlüssel. Damit kann er den Stand lesen und Pläne vorschlagen – bestätigen, verbinden oder Schlüssel sehen kann er nicht.</p>
+  {% if neuer_schluessel %}
+  <p class="meldung gut" role="status">Neuer Schlüssel – er wird nur dieses eine Mal angezeigt. Gib ihn dem Agenten direkt, nicht über einen Chat mit anderen:</p>
+  <p class="adresse schluessel">{{ neuer_schluessel }}</p>
+  {% endif %}
+  {% for h in helfer %}
+  <form method="post" action="/helfer/{{ h.id }}/entziehen" class="zeile">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <span>{{ h.name }} · {{ 'zuletzt aktiv' if h.zuletzt else 'noch nie benutzt' }}</span>
+    <button type="submit" class="text">Schlüssel entziehen</button>
+  </form>
+  {% endfor %}
+  <form method="post" action="/helfer/neu" class="reihe">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="helfer-name" class="unsichtbar">Name des Agenten</label>
+    <input id="helfer-name" name="name" type="text" placeholder="Name, z. B. Claude am Notebook" maxlength="40" required>
+    <button type="submit" class="leise">Schlüssel erzeugen</button>
+  </form>
+</div>
+{% endif %}
+
 <h2 class="gruppe"><span>Module</span></h2>
 <div class="raster">
   {% for s in module %}

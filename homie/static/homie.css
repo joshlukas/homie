@@ -274,3 +274,24 @@ button.rund[aria-pressed="true"] .punkt { border-radius: 3px; animation: puls 1.
 .kachel.ampel-gruen { border-color: rgba(61, 220, 151, 0.5); }
 .kachel.ampel-gelb { border-color: rgba(255, 196, 107, 0.6); }
 .kachel.ampel-rot { border-color: rgba(255, 107, 139, 0.6); }
+
+/* ---------- Etappe 3: Pläne, Agenten, virtuelle Maschinen ---------- */
+.felder { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0 12px; }
+input[type="number"] { width: 100%; min-height: 46px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--glas-kante); background: rgba(10, 12, 32, 0.45); color: var(--text); font: 16px var(--schrift); }
+.reihe { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 0; }
+.reihe input { flex: 1 1 220px; }
+.schluessel { margin: 10px 0 14px; padding: 12px 14px; border-radius: 12px; background: rgba(10, 12, 32, 0.5); border: 1px dashed var(--glas-kante); color: var(--text); font: 14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; user-select: all; }
+.liste a { color: var(--text); }
+.plan-schritte { margin: 6px 0; padding-left: 22px; }
+.plan-schritte li { padding: 7px 0 7px 4px; }
+.plan-pruefung, .plan-grenzen { list-style: none; margin: 4px 0; padding: 0; }
+.plan-pruefung li { display: flex; gap: 10px; padding: 7px 0; }
+.plan-pruefung i { flex: none; font-style: normal; font-weight: 700; width: 18px; }
+.plan-pruefung .gut i { color: var(--good); }
+.plan-pruefung .schlecht { color: #ffc2cf; }
+.plan-pruefung .schlecht i { color: var(--bad); }
+.plan-grenzen li { padding: 6px 0 6px 18px; position: relative; color: var(--muted); }
+.plan-grenzen li::before { content: "–"; position: absolute; left: 0; }
+.geraet .balken { margin: 8px 0 4px; height: 6px; }
+.dienste .hell { color: var(--text); }
+.geraet + .geraet { margin-top: 12px; }

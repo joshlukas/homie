@@ -1,0 +1,29 @@
+{% extends "basis.html" %}
+{% block titel %}Homie – Plan{% endblock %}
+{% block inhalt %}
+<section class="kopf">
+  <h1>{{ plan.titel }}</h1>
+  <p class="leiser">Vorgeschlagen von {{ plan.von }}. Das ist ein Entwurf: Bis jetzt wurde nichts angelegt und nichts geladen.</p>
+</section>
+
+<h2 class="gruppe"><span>Was passieren würde</span></h2>
+<div class="glas tagkarte"><ol class="plan-schritte">{% for s in plan.schritte %}<li>{{ s }}</li>{% endfor %}</ol></div>
+
+<h2 class="gruppe"><span>Prüfung deines Rechners</span></h2>
+<div class="glas tagkarte">
+  <ul class="plan-pruefung">{% for p in plan.pruefung %}<li class="{{ 'gut' if p.ok else 'schlecht' }}"><i aria-hidden="true">{{ '✓' if p.ok else '✗' }}</i><span>{{ p.text }}</span></li>{% endfor %}</ul>
+</div>
+
+<h2 class="gruppe"><span>Was nicht passiert</span></h2>
+<div class="glas tagkarte"><ul class="plan-grenzen">{% for g in plan.grenzen %}<li>{{ g }}</li>{% endfor %}</ul></div>
+
+<div class="knoepfe">
+  <button type="button" disabled>Bestätigen und ausführen (folgt)</button>
+  <form method="post" action="/plan/{{ plan.id }}/verwerfen">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="leise">Plan verwerfen</button>
+  </form>
+  <a class="knopf leise" href="/onboarding#plaene">Zurück</a>
+</div>
+<p class="leiser klein" style="margin-top: 12px">{% if plan.machbar %}Das Ausführen wird im nächsten Ausbauschritt freigeschaltet.{% else %}So ist der Plan nicht machbar – siehe Prüfung. Verwirf ihn und plane kleiner.{% endif %}</p>
+{% endblock %}

@@ -32,6 +32,25 @@
   {% endfor %}
 </div>
 
+{% if virt_fehler %}
+<h2 class="gruppe"><span>Virtuelle Maschinen</span></h2>
+<div class="glas leer"><p class="meldung" role="alert">{{ virt_fehler }}</p></div>
+{% elif virt %}
+<h2 class="gruppe"><span>Virtuelle Maschinen</span></h2>
+{% for k in virt.knoten %}
+<div class="glas geraet">
+  <header><h3>{{ k.name }}</h3><span class="chip {{ 'verbunden' if k.an else '' }}">{{ 'läuft' if k.an else 'aus' }}</span></header>
+  <p class="leiser klein">{{ k.kerne }} Kerne · {{ k.ram_frei | round | int }} von {{ k.ram_gesamt | round | int }} GB Arbeitsspeicher frei</p>
+  <div class="balken"><i style="width: {{ k.ram_anteil }}%"></i></div>
+  <ul class="dienste">
+    {% for g in virt.gaeste if g.knoten == k.name %}
+    <li class="neben"><i class="{{ 'an' if g.an else 'aus' }}"></i><span class="hell">{{ g.name }}</span><small>{{ g.art }} {{ g.vmid }} · {{ g.kerne }} Kerne · {{ g.ram | round | int }} GB{% if not g.an %} · aus{% endif %}</small></li>
+    {% endfor %}
+  </ul>
+</div>
+{% endfor %}
+{% endif %}
+
 {% if container %}
 <h2 class="gruppe"><span>Docker auf diesem Rechner</span></h2>
 <div class="glas geraet">

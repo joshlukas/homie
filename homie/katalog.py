@@ -38,10 +38,10 @@ KATALOG: tuple[Eintrag, ...] = (
         "proxmox", "virtualisierung", "Proxmox VE", "Server, auf dem virtuelle Maschinen laufen",
         (8006,), ("proxmox virtual environment",),
         felder=(
-            Feld("token-id", "Token-ID", geheim=False, hinweis="Form: benutzer@bereich!name – Datacenter → Permissions → API Tokens"),
+            Feld("token-id", "Token-ID", geheim=False, hinweis="Form: benutzer@bereich!name – Datacenter → Permissions → API Tokens. Zum Lesen genügt die Rolle PVEAuditor."),
             Feld("token", "Token-Geheimnis", hinweis="wird beim Anlegen des Tokens einmal angezeigt"),
         ),
-        schaltet_frei="Netzplan mit VMs; später: fehlende Dienste anlegen", farbe="#c77dff",
+        schaltet_frei="VMs im Netzplan, Pläne für neue VMs", farbe="#c77dff",
     ),
     Eintrag(
         "homeassistant", "homeassistant", "Home Assistant", "Smart-Home-Zentrale",

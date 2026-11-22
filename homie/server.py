@@ -11,7 +11,7 @@ import aiohttp
 import jinja2
 from aiohttp import web
 
-from . import assistent, dokumente, gesundheit, katalog, module, tag, verbinden
+from . import agenten, assistent, dokumente, gesundheit, katalog, module, plaene, proxmox, tag, verbinden
 from .ablage import Ablage
 from .anmeldung import COOKIE, MIN_LAENGE, Anmeldung, passwort_maengel
 from .config import PAKET, VERSION, Einstellungen
@@ -33,6 +33,7 @@ K_ABLAGE = web.AppKey("ablage", Ablage)
 K_JINJA = web.AppKey("jinja", jinja2.Environment)
 K_ERK = web.AppKey("erkundung", Erkundung)
 K_SITZUNG = web.RequestKey("sitzung", object)
+K_AGENT = web.RequestKey("agent", str)
 
 
 def _ist_api(request: web.Request) -> bool:
@@ -79,6 +80,13 @@ async def herkunft(request: web.Request, handler):
 async def torwaechter(request: web.Request, handler):
     """Ohne Sitzung ist nichts erreichbar außer Login, Einrichtung und dem Aussehen dieser beiden Seiten."""
     if request.path.startswith("/static/"):
+        return await handler(request)
+    if request.path == "/agent" or request.path.startswith("/agent/"):
+        # Helfende Agenten: eigener Schlüssel, eigene, enge Wege – keine Sitzung, kein Zugriff auf den Rest.
+        name = agenten.finden(request.app[K_DB], request.headers.get("Authorization"))
+        if name is None:
+            return web.json_response({"fehler": "kein gültiger Agenten-Schlüssel"}, status=401)
+        request[K_AGENT] = name
         return await handler(request)
     anm = request.app[K_ANM]
     sitzung = anm.sitzung_finden(request.cookies.get(COOKIE))
@@ -234,7 +242,8 @@ def _beispiele(app: web.Application) -> list[dict]:
     } for d in roh]
 
 
-async def onboarding(request: web.Request, status: int = 200, kartenfehler: dict | None = None, hand: str = "") -> web.Response:
+async def onboarding(request: web.Request, status: int = 200, kartenfehler: dict | None = None, hand: str = "",
+                     planfehler: str = "", neuer_schluessel: str = "") -> web.Response:
     app = request.app
     beispiel = request.query.get("beispiel") == "1"
     erk = app[K_ERK]
@@ -245,6 +254,9 @@ async def onboarding(request: web.Request, status: int = 200, kartenfehler: dict
         dienste=[k for k in karten if k["zustand"] != "ignoriert"],
         ignoriert=[k for k in karten if k["zustand"] == "ignoriert"],
         kartenfehler=kartenfehler or {}, ok=request.query.get("ok", ""), hand=hand,
+        proxmox_da=_zugang(app, "virtualisierung", ("token-id", "token")) is not None,
+        plaene=plaene.alle(app[K_DB]), rezepte=plaene.REZEPTE, planfehler=planfehler,
+        helfer=agenten.alle(app[K_DB]), neuer_schluessel=neuer_schluessel,
         module=[s for s in module.stand(app[K_DB], app[K_ABLAGE]) if not s.modul.kern],
         docker=await _docker_stand(app),
         erkundung={"laeuft": erk.laeuft, "text": erk.text, "prozent": int(erk.anteil * 100), "fehler": erk.fehler},
@@ -408,6 +420,111 @@ async def dienst_zustand(request: web.Request) -> web.Response:
     raise web.HTTPSeeOther("/onboarding")
 
 
+# ---------- Pläne ----------
+
+async def plan_neu(request: web.Request) -> web.Response:
+    app = request.app
+    zugang = _zugang(app, "virtualisierung", ("token-id", "token"))
+    if zugang is None:
+        return await onboarding(request, 400, planfehler="Dafür muss zuerst Proxmox verbunden sein.")
+    daten = await request.post()
+    try:
+        nummer = await plaene.entwerfen(app[K_DB], zugang, str(daten.get("rezept", "")), dict(daten), "dir")
+    except plaene.PlanFehler as e:
+        return await onboarding(request, 400, planfehler=str(e))
+    raise web.HTTPSeeOther(f"/plan/{nummer}")
+
+
+def _plan(request: web.Request) -> dict:
+    p = plaene.einer(request.app[K_DB], int(request.match_info["id"]))
+    if p is None or p["zustand"] == "verworfen":
+        raise web.HTTPNotFound()
+    return p
+
+
+async def plan_zeigen(request: web.Request) -> web.Response:
+    return _seite(request, "plan.html", plan=_plan(request))
+
+
+async def plan_verwerfen(request: web.Request) -> web.Response:
+    plaene.verwerfen(request.app[K_DB], _plan(request)["id"])
+    raise web.HTTPSeeOther("/onboarding#plaene")
+
+
+# ---------- Helfende Agenten: Verwaltung (Mensch) und Schnittstelle (Agent) ----------
+
+async def helfer_neu(request: web.Request) -> web.Response:
+    name = str((await request.post()).get("name", ""))
+    return await onboarding(request, neuer_schluessel=agenten.anlegen(request.app[K_DB], name))
+
+
+async def helfer_entziehen(request: web.Request) -> web.Response:
+    agenten.entziehen(request.app[K_DB], int(request.match_info["id"]))
+    raise web.HTTPSeeOther("/onboarding#helfer")
+
+
+AGENT_REGELN = [
+    "Du darfst lesen und Pläne vorschlagen. Bestätigen und ausführen kann nur der Mensch im Dashboard.",
+    "Erst lesen (/agent/zustand), dann dem Menschen in einfachen Worten sagen, was du vorschlägst, dann den Plan einreichen.",
+    "Frag nie nach Passwörtern oder Schlüsseln und gib keine aus. Schlüssel trägt der Mensch selbst im Dashboard ein.",
+]
+
+
+def _plan_kurz(p: dict) -> dict:
+    return {k: p[k] for k in ("id", "titel", "rezept", "parameter", "zustand", "von", "machbar", "schritte", "pruefung", "grenzen")}
+
+
+async def agent_start(request: web.Request) -> web.Response:
+    return web.json_response({
+        "homie": VERSION, "agent": request[K_AGENT], "regeln": AGENT_REGELN,
+        "wege": {"GET /agent/zustand": "Module, Dienste, letzte Erkundung, Pläne", "GET /agent/rezepte": "was sich planen lässt",
+                 "GET /agent/plaene": "alle Pläne", "POST /agent/plaene": "Plan vorschlagen: {\"rezept\": …, \"parameter\": {…}}"},
+    })
+
+
+async def agent_zustand(request: web.Request) -> web.Response:
+    app = request.app
+    return web.json_response({
+        "version": VERSION,
+        "module": [{"id": s.modul.id, "titel": s.modul.titel, "aktiv": s.aktiv, "fehlt": s.fehlt} for s in module.stand(app[K_DB], app[K_ABLAGE])],
+        "dienste": [{"id": d["id"], "name": d["name"], "art": d["art"], "zustand": d["zustand"], "adresse": d["adresse"]} for d in _dienste(app)],
+        "erkundung": {k: v for k, v in (letzte(app[K_DB]) or {}).items() if k in ("zeit", "geraete", "dienste", "container", "docker")},
+        "plaene": [_plan_kurz(p) for p in plaene.alle(app[K_DB])],
+    })
+
+
+async def agent_rezepte(request: web.Request) -> web.Response:
+    return web.json_response([{
+        "id": r.id, "titel": r.titel, "beschreibung": r.beschreibung,
+        "parameter": {"name": "Name der VM (Kleinbuchstaben, Ziffern, Bindestriche)",
+                      **{z.name: f"{z.titel}, {z.von}–{z.bis}{' ' + z.einheit if z.einheit else ''}, Standard {z.standard}" for z in r.zahlen}},
+    } for r in plaene.REZEPTE])
+
+
+async def agent_plaene(request: web.Request) -> web.Response:
+    return web.json_response([_plan_kurz(p) for p in plaene.alle(request.app[K_DB])])
+
+
+async def agent_plan_vorschlagen(request: web.Request) -> web.Response:
+    app = request.app
+    try:
+        eingabe = await request.json()
+        parameter = dict(eingabe.get("parameter") or {})
+    except (ValueError, AttributeError, TypeError):
+        return web.json_response({"fehler": "Erwartet wird JSON: {\"rezept\": …, \"parameter\": {…}}"}, status=400)
+    zugang = _zugang(app, "virtualisierung", ("token-id", "token"))
+    if zugang is None:
+        return web.json_response({"fehler": "Proxmox ist nicht verbunden. Das kann nur der Mensch im Dashboard tun."}, status=409)
+    if len([p for p in plaene.alle(app[K_DB]) if p["zustand"] == "entwurf"]) >= 20:
+        return web.json_response({"fehler": "Es gibt schon viele offene Pläne. Bitte erst alte verwerfen lassen."}, status=429)
+    try:
+        nummer = await plaene.entwerfen(app[K_DB], zugang, str(eingabe.get("rezept", "")), parameter, f"Agent {request[K_AGENT]}")
+    except plaene.PlanFehler as e:
+        return web.json_response({"fehler": str(e)}, status=400)
+    return web.json_response({**_plan_kurz(plaene.einer(app[K_DB], nummer)),
+                              "hinweis": "Der Plan ist ein Entwurf. Bitte den Menschen, ihn im Dashboard unter Onboarding → Pläne zu lesen."}, status=201)
+
+
 def _netzplan(app: web.Application) -> dict:
     db, stand = app[K_DB], letzte(app[K_DB]) or {}
     dienste: dict[str, list[dict]] = {}
@@ -433,7 +550,14 @@ async def modulseite(request: web.Request) -> web.Response:
     for s in module.stand(request.app[K_DB], request.app[K_ABLAGE]):
         if s.modul.id == kennung and s.aktiv and not s.modul.kern:
             if kennung == "netzplan":
-                return _seite(request, "netzplan.html", modul=s.modul, **_netzplan(request.app))
+                virt, virt_fehler = None, ""
+                zugang = _zugang(request.app, "virtualisierung", ("token-id", "token"))
+                if zugang:
+                    try:
+                        virt = await proxmox.lesen(zugang[0], zugang[1]["token-id"], zugang[1]["token"])
+                    except proxmox.ProxmoxFehler as e:
+                        virt_fehler = str(e)
+                return _seite(request, "netzplan.html", modul=s.modul, virt=virt, virt_fehler=virt_fehler, **_netzplan(request.app))
             if kennung == "dokumente":
                 return await _seite_dokumente(request, s.modul)
             if kennung == "tag":
@@ -503,6 +627,16 @@ def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, er
         web.get("/api/netzplan", api_netzplan),
         web.post("/erkundung/start", erkundung_start),
         web.post("/dienst/neu", dienst_neu),
+        web.post("/plan/neu", plan_neu),
+        web.get("/plan/{id:\\d+}", plan_zeigen),
+        web.post("/plan/{id:\\d+}/verwerfen", plan_verwerfen),
+        web.post("/helfer/neu", helfer_neu),
+        web.post("/helfer/{id:\\d+}/entziehen", helfer_entziehen),
+        web.get("/agent", agent_start),
+        web.get("/agent/zustand", agent_zustand),
+        web.get("/agent/rezepte", agent_rezepte),
+        web.get("/agent/plaene", agent_plaene),
+        web.post("/agent/plaene", agent_plan_vorschlagen),
         web.post("/m/aufnahme/senden", aufnahme_senden),
         web.get("/m/dokumente/vorschau/{nr:\\d+}", dokument_vorschau),
         web.post("/dienst/{id}/verbinden", dienst_verbinden),

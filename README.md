@@ -2,7 +2,7 @@
 
 Ein Dashboard fürs Heimnetz, das sich selbst aufbaut: Homie erkundet dein Netz (nur lesend), zeigt gefundene Dienste als Karten, und sobald du einen Dienst verbindest, schaltet sich das passende Modul ein – Tagesüberblick, Aufnahme mit lokaler KI, Gesundheit, Finanzen, Dokumente, Netzplan.
 
-**Stand: Etappe 2.** Installation, Anmeldung, Erkundung des Heimnetzes, Verbinden mit geprüften Schlüsseln, Netzplan – und fünf Module mit Inhalt:
+**Stand: Etappe 3 (begonnen).** Installation, Anmeldung, Erkundung des Heimnetzes, Verbinden mit geprüften Schlüsseln, Netzplan mit virtuellen Maschinen, Pläne für neue VMs (noch ohne Ausführen), Schnittstelle für helfende Agenten – und fünf Module mit Inhalt:
 
 - **Mein Tag** – Termine, Aufgaben und Wetter aus Home Assistant
 - **Gesundheit** – Schritte, Puls, Schlaf und mehr aus der Home-Assistant-App des Handys, mit Wochenverlauf
@@ -74,6 +74,12 @@ Homie meldet sich dabei nirgends an und ändert nichts. Das Ergebnis liegt aussc
 **Von Hand hinzufügen:** Dienste, die nur über einen Namen erreichbar sind (etwa hinter einem Proxy), findet die Suche nach Adressen nicht. Dafür gibt es im Onboarding ein Feld für die Adresse; Homie sieht dort nach, ob ein bekannter Dienst antwortet. Zusätzlich sieht die Erkundung sich alle Ports an, die Docker auf diesem Rechner veröffentlicht.
 
 **Verbinden:** Auf der Karte eines Dienstes trägst du seinen Schlüssel ein. Homie prüft ihn mit einem einzigen lesenden Aufruf bei genau diesem Dienst und legt ihn erst dann verschlüsselt ab. *Trennen* löscht ihn wieder.
+
+## Pläne und helfende Agenten
+
+Ist Proxmox verbunden, zeigt der Netzplan auch die virtuellen Maschinen, und Homie kann **Pläne** für neue VMs aufschreiben: was angelegt würde, was dafür geladen wird und woher, und ob dein Rechner genug Arbeitsspeicher und Platz hat. Ein Plan ist ein Entwurf – angelegt wird nichts. Das Ausführen bestätigter Pläne ist noch nicht eingebaut.
+
+Wer sich von einem KI-Agenten helfen lässt, erzeugt ihm im Onboarding einen eigenen Schlüssel. Damit kann der Agent den Stand lesen und Pläne vorschlagen; bestätigen, verbinden oder Schlüssel sehen kann er nicht. Einzelheiten in [AGENTS.md](AGENTS.md).
 
 ## Module
 
