@@ -1,0 +1,12 @@
+{% extends "basis.html" %}
+{% block titel %}Homie – {{ modul.titel }}{% endblock %}
+{% block inhalt %}
+<section class="kopf">
+  <h1>{{ modul.titel }}</h1>
+  <p class="leiser">{{ modul.beschreibung }}</p>
+</section>
+<div class="glas leer">
+  <h3>Dieses Modul ist freigeschaltet</h3>
+  <p class="leiser">Sein Inhalt wird in einem späteren Ausbauschritt übernommen.</p>
+</div>
+{% endblock %}

@@ -1,0 +1,19 @@
+# Privates gehört nie ins Repository – nur Programm und Beispielkonfiguration.
+.env
+.env.*
+!.env.example
+/data/
+/daten/
+*.sqlite
+*.sqlite-*
+*.key
+*.pem
+*.log
+
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.idea/
+.vscode/
+.DS_Store

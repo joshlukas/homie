@@ -1,0 +1,64 @@
+# Homie – startet ohne Vorkonfiguration:
+#   Portainer: Stacks → Add stack → Repository → diese Datei (Standardpfad docker-compose.yml)
+#   Ohne Portainer: docker compose up -d
+# Alle Einstellungen sind freiwillig, siehe .env.example.
+
+name: homie
+
+services:
+  homie:
+    build: .
+    image: homie:lokal
+    pull_policy: build            # wird immer aus diesem Repository gebaut, nie von außen geladen
+    container_name: homie
+    restart: unless-stopped
+    # Im Heimnetz des Rechners (kein abgeschottetes Docker-Netz): nur so kann Homie später
+    # Geräte und Dienste im Heimnetz selbst finden. Erreichbar unter http://<Rechner>:8090
+    network_mode: host
+    environment:
+      HOMIE_PORT: ${HOMIE_PORT:-8090}
+      HOMIE_DOCKER_LESEN: ${HOMIE_DOCKER_LESEN:-1}
+      HOMIE_DOCKER_URL: http://127.0.0.1:${HOMIE_DOCKER_PORT:-23750}
+      HOMIE_MASTER_KEY: ${HOMIE_MASTER_KEY:-}
+      TZ: ${TZ:-Europe/Berlin}
+    volumes:
+      - homie-daten:/data          # alles Private: Konto, Erkanntes, verschlüsselte Schlüssel
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging: &protokoll
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # Zwischendienst: gibt Homie einen NUR LESENDEN Blick auf Docker (welche Container laufen).
+  # Homie selbst bekommt den Docker-Zugang nie direkt. Abschalten: HOMIE_DOCKER_LESEN=0
+  docker-lesen:
+    image: tecnativa/docker-socket-proxy:v0.5.0
+    container_name: homie-docker-lesen
+    restart: unless-stopped
+    deploy:
+      replicas: ${HOMIE_DOCKER_LESEN:-1}
+    environment:
+      CONTAINERS: 1
+      IMAGES: 1
+      NETWORKS: 1
+      VOLUMES: 1
+      INFO: 1
+      VERSION: 1
+      PING: 1
+      POST: 0                      # nichts starten, stoppen, ändern oder löschen
+      EXEC: 0
+      SECRETS: 0
+      AUTH: 0
+    ports:
+      - "127.0.0.1:${HOMIE_DOCKER_PORT:-23750}:2375"   # nur auf diesem Rechner, nicht im Heimnetz
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    security_opt: ["no-new-privileges:true"]
+    logging: *protokoll
+
+volumes:
+  homie-daten:
+    name: homie-daten

@@ -1,0 +1,21 @@
+{
+  "_hinweis": "Erfundener Beispielzustand für die Ansicht /onboarding?beispiel=1. Die Adressen stammen aus dem für Dokumentation reservierten Bereich 192.0.2.0/24 und gehören zu keinem echten Netz.",
+  "dienste": [
+    {
+      "art": "homeassistant", "name": "Home Assistant", "adresse": "http://192.0.2.20:8123", "zustand": "gefunden", "farbe": "#3ddc97",
+      "details": {"beschreibung": "Smart-Home-Zentrale", "braucht": "ein Zugriffstoken (langlebig)", "schaltet_frei": "Gesundheit"}
+    },
+    {
+      "art": "dokumente", "name": "Paperless-ngx", "adresse": "http://192.0.2.30:8000", "zustand": "verbunden", "farbe": "#5b9dff",
+      "details": {"beschreibung": "Dokumentenarchiv", "braucht": "ein API-Token (nur lesen)", "schaltet_frei": "Dokumente"}
+    },
+    {
+      "art": "ki-lokal", "name": "Ollama", "adresse": "http://192.0.2.40:11434", "zustand": "gefunden", "farbe": "#2fd4c4",
+      "details": {"beschreibung": "Lokale KI für Text und Sprache", "braucht": "keinen Schlüssel", "schaltet_frei": "Aufnahme"}
+    },
+    {
+      "art": "virtualisierung", "name": "Proxmox VE", "adresse": "https://192.0.2.10:8006", "zustand": "gefunden", "farbe": "#c77dff",
+      "details": {"beschreibung": "Server, auf dem die virtuellen Maschinen laufen", "braucht": "ein API-Token", "schaltet_frei": "Netzplan; später: fehlende Dienste anlegen"}
+    }
+  ]
+}

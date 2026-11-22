@@ -1,0 +1,65 @@
+{% extends "basis.html" %}
+{% block titel %}Homie – Onboarding{% endblock %}
+{% block inhalt %}
+<section class="kopf">
+  <h1>Onboarding</h1>
+  <p class="leiser">Hier lernt Homie dein Heimnetz kennen. Gefundene Dienste erscheinen als Karten; du verbindest sie mit je einem Schlüssel, und das passende Modul schaltet sich ein.</p>
+</section>
+
+<ol class="schritte" aria-label="Ablauf">
+  <li class="fertig"><b>1</b><span>Passwort angelegt</span></li>
+  <li{% if dienste and not beispiel %} class="fertig"{% endif %}><b>2</b><span>Heimnetz erkunden</span></li>
+  <li><b>3</b><span>Dienste verbinden</span></li>
+  <li><b>4</b><span>Module nutzen</span></li>
+</ol>
+
+<h2 class="gruppe"><span>Gefundene Dienste</span></h2>
+{% if beispiel %}
+<p class="glas hinweis"><b>Beispielansicht.</b> Diese Karten sind erfunden und zeigen nur, wie es später aussieht. <a href="/onboarding">Zurück zum echten Stand</a></p>
+{% endif %}
+{% if dienste %}
+<div class="raster">
+  {% for d in dienste %}
+  <article class="glas karte" style="--c: {{ d.farbe or '#8b7cff' }}">
+    <header><h3>{{ d.name }}</h3><span class="chip {{ d.zustand }}">{{ d.zustand }}</span></header>
+    <p class="leiser">{{ d.details.beschreibung or d.art }}</p>
+    {% if d.adresse %}<p class="adresse">{{ d.adresse }}</p>{% endif %}
+    {% if d.details.braucht %}<p class="braucht">Braucht: {{ d.details.braucht }}</p>{% endif %}
+    {% if d.details.schaltet_frei %}<p class="braucht">Schaltet frei: {{ d.details.schaltet_frei }}</p>{% endif %}
+    <button type="button" disabled>{{ 'Verbunden' if d.zustand == 'verbunden' else 'Verbinden' }}</button>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+<div class="glas leer">
+  <h3>Noch nichts gefunden</h3>
+  <p class="leiser">Homie hat dein Heimnetz noch nicht erkundet. Die Erkundung liest nur – sie ändert nichts – und kommt mit dem nächsten Ausbauschritt.</p>
+  <div class="knoepfe">
+    <button type="button" disabled>Heimnetz erkunden (folgt)</button>
+    <a class="knopf leise" href="/onboarding?beispiel=1">Beispiel ansehen</a>
+  </div>
+</div>
+{% endif %}
+
+<h2 class="gruppe"><span>Module</span></h2>
+<div class="raster">
+  {% for s in module %}
+  <article class="glas karte" style="--c: {{ s.modul.farbe }}">
+    <header><h3>{{ s.modul.titel }}</h3><span class="chip {{ 'verbunden' if s.aktiv else 'wartet' }}">{{ 'aktiv' if s.aktiv else 'wartet' }}</span></header>
+    <p class="leiser">{{ s.modul.beschreibung }}</p>
+    {% if s.aktiv %}
+    <a class="knopf" href="/m/{{ s.modul.id }}">Öffnen</a>
+    {% else %}
+    <ul class="fehlt">{% for f in s.fehlt %}<li>{{ f }}</li>{% endfor %}</ul>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>
+
+<h2 class="gruppe"><span>Vorbereitung</span></h2>
+<div class="glas liste">
+  <p><span>Docker-Zugriff für die Erkundung</span><b class="stand {{ docker.zustand }}">{{ docker.text }}</b></p>
+  <p><span>Schlüssel-Ablage</span><b class="stand bereit">verschlüsselt, bereit</b></p>
+  <p><span>Erreichbar</span><b class="stand bereit">nur mit Anmeldung</b></p>
+</div>
+{% endblock %}

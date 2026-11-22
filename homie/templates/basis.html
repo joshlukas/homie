@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121428">
+<meta name="robots" content="noindex, nofollow">
+<title>{% block titel %}Homie{% endblock %}</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/homie.css">
+</head>
+<body class="{% block koerper %}{% endblock %}">
+{% if csrf %}
+<header class="menue">
+  <a class="marke" href="/"><span class="logo" aria-hidden="true">H</span><b>Homie</b></a>
+  <nav class="tabs" aria-label="Bereiche">
+    {% for m in menue %}
+    {% set ziel = '/onboarding' if m.kern else '/m/' ~ m.id %}
+    <a href="{{ ziel }}"{% if pfad == ziel %} aria-current="page"{% endif %}>{{ m.titel }}</a>
+    {% endfor %}
+  </nav>
+  <form method="post" action="/logout" class="abmelden">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="leise">Abmelden</button>
+  </form>
+</header>
+{% endif %}
+<main>
+{% block inhalt %}{% endblock %}
+</main>
+<footer>Homie {{ version }} · läuft nur in deinem Heimnetz</footer>
+</body>
+</html>

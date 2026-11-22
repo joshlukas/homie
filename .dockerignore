@@ -1,0 +1,10 @@
+.git
+.env
+.env.*
+data
+daten
+tests
+scripts
+*.md
+__pycache__
+*.pyc
