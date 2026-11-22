@@ -57,7 +57,7 @@ KATALOG: tuple[Eintrag, ...] = (
         "notizdienst", "assistent", "Notiz-Assistent", "Eigener Dienst: Sprachnotizen mit lokaler KI, Kontoumsätze",
         (8099,), ('"fehler": "nicht angemeldet"',), pfad="/api/eintraege",
         felder=(Feld("token", "Schlüssel des Dienstes", hinweis="steht in der Einstellungsdatei des Dienstes (API_TOKEN)"),),
-        schaltet_frei="Aufnahme, Finanzen", farbe="#2fd4c4",
+        schaltet_frei="Aufnahme, Finanzen, Assistent; mehr in Gesundheit", farbe="#2fd4c4",
     ),
     Eintrag(
         "paperless", "dokumente", "Paperless-ngx", "Dokumentenarchiv",

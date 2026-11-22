@@ -5,6 +5,7 @@
   <h1>Gesundheit</h1>
   <p class="leiser">Was dein Handy über die Home-Assistant-App meldet. Homie liest nur und speichert nichts davon.</p>
 </section>
+{% if meldung %}<p class="meldung gut" role="status">{{ meldung }}</p>{% endif %}
 {% if fehler %}
 <div class="glas leer"><h3>Gerade keine Werte</h3><p class="meldung" role="alert">{{ fehler }}</p></div>
 {% elif not daten.werte %}
@@ -32,6 +33,39 @@
     </ul>
   </article>
   {% endfor %}
+</div>
+{% endif %}
+{% endif %}
+
+{% if lang %}
+{% if lang.vorschlaege %}
+<h2 class="gruppe"><span>War das ein Training?</span></h2>
+<div class="glas tagkarte">
+  <p class="leiser klein">Der Notiz-Assistent hat in deinen Schritten Phasen erkannt, die nach Training aussehen. Nimmst du eine an, trägt er sie als Training ein.</p>
+  <ul class="buchungen">
+    {% for v in lang.vorschlaege %}
+    <li><div><b>{{ v.text }}</b></div>
+      <form method="post" action="/m/entscheid/training" class="ja-nein"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="id" value="{{ v.id }}">
+      <button type="submit" name="annehmen" value="ja">Ja, eintragen</button><button type="submit" name="annehmen" value="nein" class="leise">Nein</button></form></li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+<h2 class="gruppe"><span>Schritte · {{ lang.spanne }} Tage</span></h2>
+<div class="glas tagkarte">
+  <div class="saeulen" role="img" aria-label="Schritte je Tag, Durchschnitt {{ lang.schnitt }}">
+    {% for t in lang.tage %}<i style="height: {{ t.anteil }}%" title="{{ t.name }} {{ t.wert }}"{% if t.woche %} class="montag"{% endif %}></i>{% endfor %}
+  </div>
+  <p class="leiser klein">Durchschnitt {{ lang.schnitt }} Schritte am Tag{% if lang.stand %} · Daten bis {{ lang.stand }}{% endif %} · hellere Säule = Montag</p>
+</div>
+{% if lang.training %}
+<h2 class="gruppe"><span>Trainings</span></h2>
+<div class="glas tagkarte">
+  <ul class="buchungen">
+    {% for t in lang.training %}
+    <li><div><b>{{ t.titel }}</b><small>{{ [t.tag, t.dauer, t.strecke, 'geschätzt' if t.geschaetzt else ''] | select | join(' · ') }}</small></div></li>
+    {% endfor %}
+  </ul>
 </div>
 {% endif %}
 {% endif %}

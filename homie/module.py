@@ -29,6 +29,10 @@ class Modul:
     kern: bool = False             # Kern-Module sind immer da (Onboarding)
     farbe: str = "#8b7cff"
 
+    @property
+    def pfad(self) -> str:
+        return f"/{self.id}" if self.kern else f"/m/{self.id}"
+
 
 @dataclass
 class ModulStand:
@@ -46,7 +50,7 @@ class ModulStand:
 
 
 MODULE: tuple[Modul, ...] = (
-    Modul("onboarding", "Onboarding", "Dienste finden, verbinden und Module freischalten.", kern=True),
+    Modul("uebersicht", "Übersicht", "Alle verbundenen und gefundenen Dienste mit ihrem Zustand.", kern=True),
     Modul(
         "tag", "Mein Tag", "Termine, Aufgaben und das Wichtigste für heute.",
         (Bedarf("homeassistant", "Home Assistant (kennt Kalender, Aufgaben und Wetter)", ("token",)),), farbe="#ff5fa2",
@@ -71,6 +75,11 @@ MODULE: tuple[Modul, ...] = (
         "netzplan", "Netzplan", "Alle Geräte und Dienste im Heimnetz als Plan.",
         (Bedarf("*", "mindestens ein gefundenes Gerät (nach der ersten Erkundung)", zustand="gefunden"),), farbe="#c77dff",
     ),
+    Modul(
+        "assistent", "Assistent", "Was der Notiz-Assistent über dich gelernt hat und was die KI kostet.",
+        (Bedarf("assistent", "ein Notiz-Assistent (eigener Dienst)", ("token",)),), farbe="#a36bff",
+    ),
+    Modul("onboarding", "Onboarding", "Dienste finden, verbinden und Module freischalten.", kern=True),
 )
 
 

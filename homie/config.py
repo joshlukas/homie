@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "0.7.0"
+VERSION = "0.8.0"
 PAKET = Path(__file__).resolve().parent
 
 
@@ -24,6 +24,11 @@ class Einstellungen:
     hauptschluessel: str   # optional: Hauptschlüssel von außen statt Datei im Datenordner
     docker_url: str        # Adresse des nur lesenden Docker-Zwischendienstes ("" = aus)
     beispiele: Path        # Beispielzustand für das Onboarding (keine echten Daten)
+
+    @property
+    def seiten(self) -> Path:
+        """Eigene Seiten des Nutzers (HTML-Dateien), die als zusätzliche Tabs erscheinen."""
+        return self.daten / "seiten"
 
     @property
     def datenbank(self) -> Path:

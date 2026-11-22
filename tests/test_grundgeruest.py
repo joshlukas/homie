@@ -89,7 +89,7 @@ class Web(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.c.get("/m/tag")).status, 404)
         self.assertIn("Beispielansicht", await (await self.c.get("/onboarding?beispiel=1")).text())
         z = await (await self.c.get("/api/zustand")).json()
-        self.assertEqual(z["module_aktiv"], ["onboarding"])
+        self.assertEqual(z["module_aktiv"], ["uebersicht", "onboarding"])
         self.assertEqual(z["erkundung"], {"docker": "aus"})
         # Abmelden ohne Sicherheitsmarke wird abgelehnt, mit Marke klappt es
         self.assertEqual((await self.c.post("/logout", allow_redirects=False)).status, 403)
@@ -119,7 +119,7 @@ class Web(unittest.IsolatedAsyncioTestCase):
         db, ablage = self.app[K_DB], self.app[K_ABLAGE]
         db.ausfuehren("INSERT INTO dienst (art, name, zustand, gefunden) VALUES ('dokumente','Archiv','gefunden',0)")
         aktiv = lambda: {s.modul.id for s in module.stand(db, ablage) if s.aktiv}
-        self.assertEqual(aktiv(), {"onboarding", "netzplan"})       # Netzplan braucht nur einen gefundenen Dienst
+        self.assertEqual(aktiv(), {"uebersicht", "onboarding", "netzplan"})       # Netzplan braucht nur einen gefundenen Dienst
         db.ausfuehren("UPDATE dienst SET zustand='verbunden'")
         self.assertNotIn("dokumente", aktiv())                       # verbunden, aber Schlüssel fehlt
         ablage.setzen(module.schluesselname(1, "token"), "geheim-123")

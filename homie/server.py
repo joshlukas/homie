@@ -5,11 +5,14 @@ import asyncio
 import hmac
 import ipaddress
 import json
+import re
+import time
 from urllib.parse import urlsplit
 
 import aiohttp
 import jinja2
 from aiohttp import web
+from yarl import URL
 
 from . import agenten, assistent, ausfuehren, dokumente, gesundheit, katalog, module, plaene, proxmox, tag, verbinden
 from .ablage import Ablage
@@ -107,6 +110,16 @@ async def torwaechter(request: web.Request, handler):
     return await handler(request)
 
 
+def _eigene_seiten(app: web.Application) -> list[dict]:
+    """HTML-Dateien im Ordner „seiten“ des Datenordners werden zu zusätzlichen Tabs (z. B. ein eigener Blueprint)."""
+    try:
+        dateien = sorted(app[K_EINST].seiten.glob("*.html"))
+    except OSError:
+        return []
+    return [{"id": d.stem, "titel": d.stem.replace("-", " ").replace("_", " ").title(), "datei": d}
+            for d in dateien[:8] if re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,30}", d.stem)]
+
+
 def _seite(request: web.Request, vorlage: str, status: int = 200, **werte) -> web.Response:
     app = request.app
     sitzung = request.get(K_SITZUNG)
@@ -114,7 +127,8 @@ def _seite(request: web.Request, vorlage: str, status: int = 200, **werte) -> we
     if sitzung is not None:
         menue = [s.modul for s in module.stand(app[K_DB], app[K_ABLAGE]) if s.aktiv]
     html = app[K_JINJA].get_template(vorlage).render(
-        version=VERSION, pfad=request.path, menue=menue, csrf=sitzung.csrf if sitzung else "", **werte
+        version=VERSION, pfad=request.path, menue=menue, csrf=sitzung.csrf if sitzung else "",
+        eigene_seiten=_eigene_seiten(app) if sitzung is not None else [], **werte
     )
     return web.Response(text=html, content_type="text/html", status=status)
 
@@ -190,7 +204,51 @@ async def logout(request: web.Request) -> web.Response:
 # ---------- Seiten ----------
 
 async def start(request: web.Request) -> web.Response:
-    raise web.HTTPSeeOther("/onboarding")
+    raise web.HTTPSeeOther("/uebersicht" if _dienste(request.app) else "/onboarding")
+
+
+async def _erreichbar(sitzung: aiohttp.ClientSession, adresse: str) -> tuple[bool, int]:
+    beginn = time.monotonic()
+    try:
+        async with sitzung.get(adresse, allow_redirects=False):
+            return True, int((time.monotonic() - beginn) * 1000)
+    except (aiohttp.ClientError, asyncio.TimeoutError, OSError, ValueError):
+        return False, 0
+
+
+async def uebersicht(request: web.Request) -> web.Response:
+    """Startseite: alle Dienste mit ihrem Zustand in diesem Augenblick (ein lesender Abruf je Dienst)."""
+    app = request.app
+    karten = [k for k in _karten(app) if k["zustand"] != "ignoriert" and k["adresse"]]
+    async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False, limit=30), timeout=aiohttp.ClientTimeout(total=3)) as s:
+        antworten = await asyncio.gather(*(_erreichbar(s, k["adresse"]) for k in karten))
+    for k, (da, ms) in zip(karten, antworten):
+        k["da"], k["ms"] = da, ms
+    karten.sort(key=lambda k: (k["da"], k["zustand"] != "verbunden", k["name"].lower()))
+    return _seite(request, "uebersicht.html", dienste=karten, da=sum(1 for k in karten if k["da"]),
+                  module=[s for s in module.stand(app[K_DB], app[K_ABLAGE]) if s.aktiv and not s.modul.kern], letzte=letzte(app[K_DB]))
+
+
+ZURUECK = ('<a href="/" style="position:fixed;z-index:2147483647;left:12px;bottom:12px;padding:9px 16px;border-radius:999px;'
+           'background:#252952;color:#eef0ff;font:600 13px system-ui,sans-serif;text-decoration:none;box-shadow:0 6px 18px rgba(0,0,0,.45)">'
+           '← Zurück zu Homie</a>')
+
+
+async def eigene_seite(request: web.Request) -> web.Response:
+    """Eigene Seite aus dem Datenordner. Sie läuft abgeschottet: Skripte dürfen laufen, kommen aber weder an Homies
+    Sitzung noch an seine Schnittstellen, und laden nichts aus dem Internet nach (außer Bildern)."""
+    seite = next((s for s in _eigene_seiten(request.app) if s["id"] == request.match_info["name"]), None)
+    if seite is None:
+        raise web.HTTPNotFound()
+    try:
+        inhalt = seite["datei"].read_text(encoding="utf-8", errors="replace")[:5_000_000]
+    except OSError:
+        raise web.HTTPNotFound()
+    stelle = re.search(r"<body[^>]*>", inhalt, re.I)
+    inhalt = inhalt[:stelle.end()] + ZURUECK + inhalt[stelle.end():] if stelle else ZURUECK + inhalt
+    return web.Response(text=inhalt, content_type="text/html", headers={
+        "Content-Security-Policy": "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox; "
+                                   "default-src 'unsafe-inline' data: blob:; img-src * data: blob:; frame-ancestors 'none'"})
 
 
 async def _docker_stand(app: web.Application) -> dict:
@@ -319,7 +377,10 @@ async def _seite_gesundheit(request: web.Request, modul: module.Modul) -> web.Re
         daten = await gesundheit.uebersicht(zugang[0], zugang[1]["token"])
     except gesundheit.GesundheitFehler as e:
         fehler = str(e)
-    return _seite(request, "gesundheit.html", status=200 if daten else 502, modul=modul, daten=daten, fehler=fehler)
+    helfer = _zugang(request.app, "assistent", ("token",))      # freiwillige Ergänzung: langer Verlauf und Trainings
+    lang = await assistent.gesundheit(helfer[0], helfer[1]["token"]) if helfer else None
+    return _seite(request, "gesundheit.html", status=200 if daten else 502, modul=modul, daten=daten, fehler=fehler, lang=lang,
+                  meldung=request.query.get("meldung", ""))
 
 
 async def _seite_aufnahme(request: web.Request, modul: module.Modul) -> web.Response:
@@ -332,6 +393,29 @@ async def _seite_aufnahme(request: web.Request, modul: module.Modul) -> web.Resp
     return _seite(request, "aufnahme.html", status=200 if daten else 502, modul=modul, daten=daten, fehler=fehler)
 
 
+async def _seite_assistent(request: web.Request, modul: module.Modul) -> web.Response:
+    zugang = _zugang(request.app, "assistent", ("token",))
+    daten, fehler = None, ""
+    try:
+        daten = await assistent.profil_und_nutzung(zugang[0], zugang[1]["token"])
+    except assistent.AssistentFehler as e:
+        fehler = str(e)
+    return _seite(request, "assistent.html", status=200 if daten else 502, modul=modul, daten=daten, fehler=fehler,
+                  meldung=request.query.get("meldung", ""))
+
+
+async def entscheid(request: web.Request) -> web.Response:
+    """Der Nutzer nimmt einen Vorschlag des Assistenten an oder lehnt ihn ab. Das ändert Daten im Assistenten."""
+    zugang = _zugang(request.app, "assistent", ("token",))
+    if zugang is None:
+        raise web.HTTPNotFound()
+    daten = await request.post()
+    art = request.match_info["art"]
+    _, meldung = await assistent.entscheid(zugang[0], zugang[1]["token"], art, str(daten.get("id", ""))[:80], daten.get("annehmen") == "ja")
+    ziel = {"finanzen": "/m/finanzen", "training": "/m/gesundheit", "profil": "/m/assistent"}[art]
+    raise web.HTTPSeeOther(str(URL(ziel).with_query(meldung=meldung)))
+
+
 async def _seite_finanzen(request: web.Request, modul: module.Modul) -> web.Response:
     zugang = _zugang(request.app, "assistent", ("token",))
     daten, fehler = None, ""
@@ -339,7 +423,7 @@ async def _seite_finanzen(request: web.Request, modul: module.Modul) -> web.Resp
         daten = await assistent.finanzen(zugang[0], zugang[1]["token"])
     except assistent.AssistentFehler as e:
         fehler = str(e)
-    return _seite(request, "finanzen.html", status=200 if daten else 502, modul=modul, daten=daten, fehler=fehler)
+    return _seite(request, "finanzen.html", status=200 if daten else 502, modul=modul, daten=daten, fehler=fehler, meldung=request.query.get("meldung", ""))
 
 
 async def aufnahme_senden(request: web.Request) -> web.Response:
@@ -585,6 +669,8 @@ async def modulseite(request: web.Request) -> web.Response:
                 return await _seite_aufnahme(request, s.modul)
             if kennung == "finanzen":
                 return await _seite_finanzen(request, s.modul)
+            if kennung == "assistent":
+                return await _seite_assistent(request, s.modul)
             return _seite(request, "modul.html", modul=s.modul)
     raise web.HTTPNotFound(text="Dieses Modul ist nicht aktiv.")
 
@@ -639,6 +725,9 @@ def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, er
         web.get("/login", login_zeigen), web.post("/login", login),
         web.post("/logout", logout),
         web.get("/onboarding", onboarding),
+        web.get("/uebersicht", uebersicht),
+        web.get("/s/{name}", eigene_seite),
+        web.post("/m/entscheid/{art:finanzen|training|profil}", entscheid),
         web.get("/m/{id}", modulseite),
         web.get("/api/zustand", api_zustand),
         web.get("/api/module", api_module),

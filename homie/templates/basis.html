@@ -16,8 +16,10 @@
   <a class="marke" href="/"><span class="logo" aria-hidden="true">H</span><b>Homie</b></a>
   <nav class="tabs" aria-label="Bereiche">
     {% for m in menue %}
-    {% set ziel = '/onboarding' if m.kern else '/m/' ~ m.id %}
-    <a href="{{ ziel }}"{% if pfad == ziel %} aria-current="page"{% endif %}>{{ m.titel }}</a>
+    <a href="{{ m.pfad }}"{% if pfad == m.pfad %} aria-current="page"{% endif %}>{{ m.titel }}</a>
+    {% endfor %}
+    {% for s in eigene_seiten %}
+    <a href="/s/{{ s.id }}"{% if pfad == '/s/' ~ s.id %} aria-current="page"{% endif %}>{{ s.titel }}</a>
     {% endfor %}
   </nav>
   <form method="post" action="/logout" class="abmelden">

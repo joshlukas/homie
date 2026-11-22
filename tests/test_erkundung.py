@@ -4,6 +4,7 @@ Es wird nur 127.0.0.1 abgefragt; kein echtes Netz, keine echten Dienste.
 """
 import datetime as dt
 import ipaddress
+import pathlib
 import secrets
 import tempfile
 import unittest
@@ -151,9 +152,10 @@ async def _nd_finanzen(request):
         "konten": [{"name": "Girokonto", "bank": "Testbank", "art": "giro", "saldo": 1234.5, "stand": "2026-03-04"}, {"name": "Karte", "bank": "Testbank", "art": "karte", "saldo": -87.1, "stand": "2026-03-03"}],
         "budget": {"frei": 412.0, "je_tag": 31.7, "rest_tage": 13, "ausgegeben": 388.0, "spielraum": 800.0, "ampel": "gruen"},
         "bilanz": {"2026-02": {"ein": 2500, "aus": -2100, "netto": 400}, "2026-03": {"ein": 2500, "aus": -2750.4, "netto": -250.4}},
-        "prognose": {"giro_ende": 950.0, "posten": [{"wer": "Miete", "betrag": -700, "gebucht": 0, "offen": -700, "tag": 3}, {"wer": "Strom", "betrag": -60, "gebucht": -60, "offen": 0, "tag": 15}]},
+        "prognose": {"giro_ende": 950.0, "posten_alt": [], "posten": [{"wer": "Miete", "betrag": -700, "gebucht": 0, "offen": -700, "tag": 3}, {"wer": "Strom", "betrag": -60, "gebucht": -60, "offen": 0, "tag": 15}]},
         "abos": [{"wer": "Musikdienst", "je_monat": -10.99}],
-        "letzte": [{"tag": "2026-03-04", "wer": "Supermarkt", "zweck": "Kartenzahlung", "betrag": -23.45, "konto": "Girokonto"}], "hinweis": None})
+        "letzte": [{"tag": "2026-03-04", "wer": "Supermarkt", "zweck": "Kartenzahlung", "betrag": -23.45, "konto": "Girokonto"}], "hinweis": None,
+        "cospend_offen": {"anzahl": 1, "summe": 31.9, "liste": [{"id": "u55", "tag": "2026-03-02", "wer": "DROGERIE 123", "betrag": 31.9, "name": "Drogerie"}]}})
 
 
 async def _nd_aufnahme(request):
@@ -161,7 +163,45 @@ async def _nd_aufnahme(request):
     return web.json_response({"ok": True, "name": "Aufnahme_test.webm"})
 
 
-NOTIZDIENST = {"/api/eintraege": _nd(_nd_eintraege), "/api/finanzen": _nd(_nd_finanzen), "POST /api/aufnahme": _nd(_nd_aufnahme)}
+ENTSCHIEDEN = []
+
+
+async def _nd_gesundheit(request):
+    heute = dt.date.today()
+    return web.json_response({
+        "stand": heute.isoformat(), "tage": [{"tag": (heute - dt.timedelta(days=n)).isoformat(), "schritte": 4000 + n * 1000} for n in range(3)],
+        "training": [{"id": "t1", "tag": heute.isoformat(), "dauer_min": 42, "art": "Laufen", "titel": "Abendrunde", "distanz_m": 6200, "quelle": "uhr"},
+                     {"id": "t2", "tag": "2020-01-01", "dauer_min": 30, "art": "Gehen", "titel": "", "distanz_m": None, "quelle": "erkannt"}],
+        "training_vorschlaege": [{"id": "2026-03-01T17:05", "tag": "2026-03-01", "von": "17:05", "bis": "17:40", "dauer_min": 35, "schritte": 4100}]})
+
+
+async def _nd_profil(request):
+    return web.json_response({"profil": "Trinkt morgens Tee.\nMag kurze Antworten.", "vorschlaege": [
+        {"id": 7, "erstellt": "2026-03-01", "abschnitt": "Essen", "art": "ergänzen", "alt": "", "neu": "Isst mittags meist warm.", "begruendung": "Kam in fünf Notizen vor."}]})
+
+
+async def _nd_cospend(request):
+    return web.json_response({"projekt": "Haushalt", "saldo": {"Person A": 12.5, "Person B": -12.5},
+                              "zeitraum": {"summe": 310.0, "anzahl": 9, "nach_kategorie": {"Lebensmittel": 200.0, "Restaurant": 110.0}},
+                              "letzte": [{"tag": "2026-03-03", "was": "Wocheneinkauf", "betrag": 84.2, "zahler": "Person A", "kategorie": "Lebensmittel"}]})
+
+
+async def _nd_ki(request):
+    return web.json_response({"aktiv": True, "tageslimit": 1.5, "heute": {"tag": "2026-03-04", "usd": 0.42, "aufrufe": 6}, "guthaben": 17.3,
+                              "tage": [{"tag": "2026-03-03", "usd": 0.1, "aufrufe": 2}, {"tag": "2026-03-04", "usd": 0.42, "aufrufe": 6}],
+                              "modelle_30_tage": {"Sonnet": {"usd": 3.2, "aufrufe": 40}}})
+
+
+def _nd_entscheid(art):
+    async def f(request):
+        ENTSCHIEDEN.append((art, await request.json()))
+        return web.json_response({"ok": True})
+    return f
+
+
+NOTIZDIENST = {"/api/eintraege": _nd(_nd_eintraege), "/api/finanzen": _nd(_nd_finanzen), "POST /api/aufnahme": _nd(_nd_aufnahme),
+               "/api/gesundheit": _nd(_nd_gesundheit), "/api/profil": _nd(_nd_profil), "/api/cospend": _nd(_nd_cospend), "/api/claude": _nd(_nd_ki),
+               **{f"POST /api/{art}/entscheid": _nd(_nd_entscheid(art)) for art in ("finanzen", "training", "profil")}}
 
 
 async def _ping(request):
@@ -337,6 +377,77 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         r = await self.c.post("/m/aufnahme/senden", data=ton, headers=kopf, allow_redirects=False)
         self.assertEqual(r.status, 303)
         self.assertEqual(len(ABGEGEBEN), 1)
+
+    async def test_uebernommenes_aus_dem_alten_dashboard(self):
+        ENTSCHIEDEN.clear()
+        await self.erkunden()
+        # Übersicht: Zustand in diesem Augenblick; ein Dienst, der nicht antwortet, fällt auf
+        self.app[K_DB].ausfuehren("INSERT INTO dienst (art, name, adresse, zustand, gefunden, details) VALUES ('medien','Abgeschaltet','http://127.0.0.1:1','gefunden',0,'{\"quelle\": \"hand\"}')")
+        r = await self.c.get("/", allow_redirects=False)
+        self.assertEqual(r.headers["Location"], "/uebersicht")
+        text = await (await self.c.get("/uebersicht")).text()
+        for erwartet in ("2 <small>von 3</small>", "Home Assistant", "erreichbar", "Abgeschaltet", "antwortet nicht", 'href="/uebersicht" aria-current="page"'):
+            self.assertIn(erwartet, text)
+        self.assertLess(text.index("Abgeschaltet"), text.index("Home Assistant"))      # Ausfälle zuerst
+        # Notiz-Assistent und Home Assistant verbinden
+        await self.c.post("/dienst/neu", data={"csrf": self.csrf, "adresse": f"127.0.0.1:{self.notizdienst}"}, allow_redirects=False)
+        nr = {d["name"]: d["id"] for d in await (await self.c.get("/api/dienste")).json()}
+        for name in ("Notiz-Assistent", "Home Assistant"):
+            r = await self.c.post(f"/dienst/{nr[name]}/verbinden", data={"csrf": self.csrf, "token": GUT}, allow_redirects=False)
+            self.assertEqual(r.status, 303)
+        self.assertIn("assistent", self.aktiv())
+        # Gesundheit: zusätzlich langer Verlauf, Trainings, Vorschlag
+        text = await (await self.c.get("/m/gesundheit")).text()
+        for erwartet in ("Schritte · 30 Tage", "Durchschnitt 5.000", "Abendrunde", "42 Min.", "6,2 km", "geschätzt", "War das ein Training?", "35 Minuten zügig gegangen", "/m/entscheid/training"):
+            self.assertIn(erwartet, text)
+        # Finanzen: geteilte Ausgaben und Vorschlag
+        text = await (await self.c.get("/m/finanzen")).text()
+        for erwartet in ("Geteilte Ausgaben", "Person A", "bekommt noch", "12,50 €", "Person B", "schuldet noch", "310 € in den letzten 30 Tagen", "Wocheneinkauf",
+                         "Geteilte Ausgabe?", "Drogerie", "31,90 €", "/m/entscheid/finanzen"):
+            self.assertIn(erwartet, text)
+        # Assistent: KI-Nutzung, Profil, Vorschlag
+        text = await (await self.c.get("/m/assistent")).text()
+        for erwartet in ("0,42 $", "6 Aufrufe", "Tagesgrenze 1,50 $", "17,30 $", "Sonnet 3,20 $", "Trinkt morgens Tee.", "Isst mittags meist warm.", "Kam in fünf Notizen vor.", "/m/entscheid/profil"):
+            self.assertIn(erwartet, text)
+        self.assertNotIn(GUT, text)
+        # Entscheiden: nur mit Sicherheitsmarke; wird genau so an den Assistenten weitergegeben
+        self.assertEqual((await self.c.post("/m/entscheid/profil", data={"id": "7", "annehmen": "ja"}, allow_redirects=False)).status, 403)
+        self.assertEqual(ENTSCHIEDEN, [])
+        for art, kennung, wahl in (("profil", "7", "ja"), ("training", "2026-03-01T17:05", "nein"), ("finanzen", "u55", "ja")):
+            r = await self.c.post(f"/m/entscheid/{art}", data={"csrf": self.csrf, "id": kennung, "annehmen": wahl}, allow_redirects=False)
+            self.assertEqual(r.status, 303, art)
+        self.assertEqual(ENTSCHIEDEN, [("profil", {"id": 7, "annehmen": True}), ("training", {"id": "2026-03-01T17:05", "annehmen": False}),
+                                       ("finanzen", {"id": "u55", "annehmen": True})])
+        self.assertEqual((await self.c.post("/m/entscheid/loeschen", data={"csrf": self.csrf, "id": "1"})).status, 404)
+        self.assertIn("Übernommen.", await (await self.c.get(r.headers["Location"])).text())
+        # ohne Anmeldung: nichts davon
+        self.c.session.cookie_jar.clear()
+        for pfad in ("/uebersicht", "/m/assistent"):
+            self.assertEqual((await self.c.get(pfad, allow_redirects=False)).status, 303, pfad)
+        r = await self.c.post("/m/entscheid/profil", data={"csrf": self.csrf, "id": "7", "annehmen": "ja"}, allow_redirects=False)
+        self.assertEqual(r.status, 303)
+        self.assertEqual(len(ENTSCHIEDEN), 3)
+
+    async def test_eigene_seite_aus_dem_datenordner_laeuft_abgeschottet(self):
+        ordner = pathlib.Path(self.tmp.name) / "seiten"
+        ordner.mkdir()
+        (ordner / "blueprint.html").write_text("<h1>Mein Plan</h1><script>parent.fetch('/api/dienste')</script>", encoding="utf-8")
+        (ordner / "Böse Datei!.html").write_text("x", encoding="utf-8")
+        text = await (await self.c.get("/onboarding")).text()
+        self.assertIn('<a href="/s/blueprint">Blueprint</a>', text)
+        self.assertNotIn("Böse", text)
+        r = await self.c.get("/s/blueprint")
+        text = await r.text()
+        self.assertIn("Mein Plan", text)
+        self.assertIn("Zurück zu Homie", text)
+        regel = r.headers["Content-Security-Policy"]
+        self.assertTrue(regel.startswith("sandbox allow-scripts"))
+        self.assertNotIn("allow-same-origin", regel)       # die Seite kommt nicht an Homies Sitzung oder Schnittstellen
+        self.assertNotIn("connect-src", regel)             # und darf nichts nachladen (default-src ohne Netzadressen)
+        for pfad in ("/s/gibtsnicht", "/s/..%2Fhomie.sqlite", "/s/B%C3%B6se%20Datei!"):
+            self.assertEqual((await self.c.get(pfad)).status, 404, pfad)
+        self.c.session.cookie_jar.clear()
+        self.assertEqual((await self.c.get("/s/blueprint", allow_redirects=False)).status, 303)
 
     async def test_von_hand_hinzufuegen_und_dokumente_lesen(self):
         self.assertNotIn("Dokumente</a>", await (await self.c.get("/onboarding")).text())

@@ -8,7 +8,21 @@
 {% if fehler %}
 <div class="glas leer"><h3>Gerade keine Zahlen</h3><p class="meldung" role="alert">{{ fehler }}</p></div>
 {% else %}
+{% if meldung %}<p class="meldung gut" role="status">{{ meldung }}</p>{% endif %}
 {% if daten.hinweis %}<p class="glas hinweis">{{ daten.hinweis }}</p>{% endif %}
+{% if daten.vorschlaege %}
+<h2 class="gruppe"><span>Geteilte Ausgabe?</span></h2>
+<div class="glas tagkarte">
+  <p class="leiser klein">Diese Kartenzahlungen stehen noch nicht bei den geteilten Ausgaben. Nimmst du eine an, trägt der Notiz-Assistent sie dort ein.</p>
+  <ul class="buchungen">
+    {% for v in daten.vorschlaege %}
+    <li><div><b>{{ v.text }}</b><small>{{ v.betrag }}</small></div>
+      <form method="post" action="/m/entscheid/finanzen" class="ja-nein"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="id" value="{{ v.id }}">
+      <button type="submit" name="annehmen" value="ja">Teilen</button><button type="submit" name="annehmen" value="nein" class="leise">Nicht teilen</button></form></li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
 {% if daten.budget %}
 <div class="kacheln">
   <div class="glas kachel ampel-{{ daten.budget.ampel }}"><b{% if daten.budget.minus %} class="minus"{% endif %}>{{ daten.budget.frei }}</b><span>noch frei diesen Monat</span></div>
@@ -64,6 +78,21 @@
         {% for p in daten.offen %}
         <li><div><b>{{ p.wer }}</b>{% if p.tag %}<small>meist um den {{ p.tag }}.</small>{% endif %}</div><span>{{ p.betrag }}</span></li>
         {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    {% if daten.geteilt %}
+    <h2 class="gruppe"><span>Geteilte Ausgaben</span></h2>
+    <div class="glas tagkarte">
+      <ul class="buchungen">
+        {% for s in daten.geteilt.salden %}<li><div><b>{{ s.wer }}</b><small>{{ 'schuldet noch' if s.minus else 'bekommt noch' }}</small></div><span class="{{ 'minus' if s.minus else 'plus' }}">{{ s.betrag }}</span></li>{% endfor %}
+      </ul>
+      <p class="leiser klein legende">{{ daten.geteilt.summe }} in den letzten 30 Tagen, {{ daten.geteilt.anzahl }} Einträge</p>
+      <ul class="wochen">
+        {% for a in daten.geteilt.arten %}<li class="breit"><span>{{ a.name }}</span><div class="balken"><i style="width: {{ a.anteil }}%"></i></div><b>{{ a.betrag }}</b></li>{% endfor %}
+      </ul>
+      <ul class="buchungen">
+        {% for u in daten.geteilt.letzte %}<li><time>{{ u.tag }}</time><div><b>{{ u.was }}</b><small>{{ [u.wer, u.art] | select | join(' · ') }}</small></div><span>{{ u.betrag }}</span></li>{% endfor %}
       </ul>
     </div>
     {% endif %}
