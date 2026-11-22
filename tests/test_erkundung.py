@@ -200,6 +200,17 @@ async def _nd_ki(request):
                               "modelle_30_tage": {"Sonnet": {"usd": 3.2, "aufrufe": 40}}})
 
 
+HANDY = "Bearer " + secrets.token_urlsafe(24)      # das Geheimnis der Handy-App; Homie kennt es nicht
+GELIEFERT = []
+
+
+async def _nd_lieferung(request):
+    if request.headers.get("Authorization") != HANDY:
+        return web.json_response({"fehler": "Signatur stimmt nicht"}, status=401)
+    GELIEFERT.append(await request.read())
+    return web.json_response({"ok": True, "tage": 1})
+
+
 def _nd_entscheid(art):
     async def f(request):
         ENTSCHIEDEN.append((art, await request.json()))
@@ -209,6 +220,7 @@ def _nd_entscheid(art):
 
 NOTIZDIENST = {"/api/eintraege": _nd(_nd_eintraege), "/api/finanzen": _nd(_nd_finanzen), "POST /api/aufnahme": _nd(_nd_aufnahme),
                "/api/gesundheit": _nd(_nd_gesundheit), "/api/profil": _nd(_nd_profil), "/api/cospend": _nd(_nd_cospend), "/api/claude": _nd(_nd_ki),
+               "POST /api/health-webhook": _nd_lieferung,
                **{f"POST /api/{art}/entscheid": _nd(_nd_entscheid(art)) for art in ("finanzen", "training", "profil")}}
 
 
@@ -509,6 +521,35 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(in_ordnung)
         self.assertTrue({"aufnahme", "finanzen", "assistent", "tag", "gesundheit"} <= self.aktiv())
         self.assertEqual(len([d for d in await (await self.c.get("/api/dienste")).json()]), 2)
+
+    async def test_briefkasten_fuer_die_gesundheits_app(self):
+        GELIEFERT.clear()
+        lieferung = json.dumps({"steps": [{"count": 4321}], "umlaut": "ä"}).encode() + b" " * 100_000      # größer als Homies übliche Grenze
+        senden = lambda kopf, inhalt=lieferung: self.c.post("/api/health-webhook", data=inhalt, headers={"Content-Type": "application/json", **kopf})
+        self.c.session.cookie_jar.clear()                              # das Handy ist bei Homie nicht angemeldet
+        self.assertEqual((await senden({})).status, 401)               # ohne Unterschrift nimmt schon Homie nichts an
+        self.assertEqual((await senden({"Authorization": "Bearer kurz"})).status, 401)
+        self.assertEqual((await senden({"Authorization": HANDY})).status, 503)    # Assistent noch nicht verbunden
+        await self.c.post("/login", data={"passwort": PW}, allow_redirects=False)
+        marke = (await (await self.c.get("/onboarding")).text()).split('name="csrf" value="')[1].split('"')[0]
+        await self.c.post("/dienst/neu", data={"csrf": marke, "adresse": f"127.0.0.1:{self.notizdienst}"}, allow_redirects=False)
+        await self.c.post("/dienst/1/verbinden", data={"csrf": marke, "token": GUT}, allow_redirects=False)
+        self.c.session.cookie_jar.clear()
+        r = await senden({"Authorization": "Bearer " + "x" * 30})      # falsches Geheimnis: wird weitergereicht, der Assistent lehnt ab
+        self.assertEqual((r.status, (await r.json())["fehler"]), (401, "Signatur stimmt nicht"))
+        self.assertEqual(GELIEFERT, [])
+        r = await senden({"Authorization": HANDY})
+        self.assertEqual((r.status, await r.json()), (200, {"ok": True, "tage": 1}))
+        self.assertEqual(GELIEFERT, [lieferung])                       # unverändert angekommen
+        self.assertEqual((await senden({"X-Signature": "sha256=" + "0" * 64})).status, 401)      # Unterschrift in der zweiten Form: weitergereicht, hier falsch
+        self.assertEqual((await senden({"Authorization": HANDY}, b"")).status, 400)
+        self.assertEqual((await senden({"Authorization": HANDY}, b"x" * 12_000_001)).status, 413)
+        # der Briefkasten öffnet sonst nichts: Lesen und andere Wege bleiben gesperrt, das Geheimnis der App ist kein Schlüssel für Homie
+        self.assertEqual((await self.c.get("/api/health-webhook", allow_redirects=False)).status, 401)
+        self.assertEqual((await self.c.get("/api/tag", headers={"Authorization": HANDY})).status, 401)
+        for _ in range(30):
+            await senden({"Authorization": HANDY}, b"{}")
+        self.assertEqual((await senden({"Authorization": HANDY}, b"{}")).status, 429)             # Bremse gegen Überfluten
 
     async def test_von_hand_hinzufuegen_und_dokumente_lesen(self):
         self.assertNotIn("Dokumente</a>", await (await self.c.get("/onboarding")).text())

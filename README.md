@@ -85,6 +85,10 @@ Ist Proxmox verbunden, zeigt der Netzplan auch die virtuellen Maschinen, und Hom
 
 Wer sich von einem KI-Agenten helfen lässt, erzeugt ihm im Onboarding einen eigenen Schlüssel. Damit kann der Agent den Stand lesen und Pläne vorschlagen; bestätigen, verbinden oder Schlüssel sehen kann er nicht. Einzelheiten in [AGENTS.md](AGENTS.md).
 
+## Gesundheitsdaten vom Handy
+
+Schickt eine Gesundheits-App auf dem Handy ihre Daten an `…/api/health-webhook`, reicht Homie sie unverändert an den Notiz-Assistenten weiter. Das ist der einzige Weg, der ohne Anmeldung etwas annimmt: Die App unterschreibt ihre Lieferung, der Notiz-Assistent prüft die Unterschrift; Homie kennt das Geheimnis der App nicht und speichert nichts. Ohne Unterschrift, bei mehr als 12 MB oder mehr als 30 Lieferungen je Minute lehnt Homie selbst ab.
+
 ## Eigene Seiten
 
 HTML-Dateien im Ordner `seiten` des Datenordners erscheinen als zusätzliche Tabs – zum Beispiel ein selbst geschriebener Plan deines Heimnetzes als `seiten/blueprint.html`. Solche Seiten laufen abgeschottet: Skripte dürfen laufen, kommen aber nicht an Homies Anmeldung oder Schnittstellen und laden nichts aus dem Internet nach (außer Bildern).

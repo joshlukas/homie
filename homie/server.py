@@ -38,6 +38,8 @@ K_ERK = web.AppKey("erkundung", Erkundung)
 K_SITZUNG = web.RequestKey("sitzung", object)
 K_AGENT = web.RequestKey("agent", str)
 K_LAUF = web.AppKey("lauf", dict)
+K_BRIEFE = web.AppKey("briefe", dict)       # Bremse für den Briefkasten der Gesundheits-App: Absender → Zeitpunkte
+BRIEFKASTEN = "/api/health-webhook"
 
 
 def _ist_api(request: web.Request) -> bool:
@@ -91,6 +93,10 @@ async def torwaechter(request: web.Request, handler):
         if name is None:
             return web.json_response({"fehler": "kein gültiger Agenten-Schlüssel"}, status=401)
         request[K_AGENT] = name
+        return await handler(request)
+    if request.path == BRIEFKASTEN and request.method == "POST":
+        # Die Gesundheits-App am Handy hat keine Anmeldung bei Homie. Sie weist sich mit ihrer Unterschrift aus,
+        # die der Notiz-Assistent prüft – ohne Unterschrift nimmt schon Homie nichts an.
         return await handler(request)
     anm = request.app[K_ANM]
     sitzung = anm.sitzung_finden(request.cookies.get(COOKIE))
@@ -474,6 +480,34 @@ async def entscheid(request: web.Request) -> web.Response:
     raise web.HTTPSeeOther(str(URL(ziel).with_query(meldung=meldung)))
 
 
+async def briefkasten(request: web.Request) -> web.Response:
+    """Nimmt die Lieferung der Gesundheits-App an und reicht sie unverändert an den Notiz-Assistenten weiter."""
+    app = request.app
+    signatur, ausweis = request.headers.get("X-Signature", ""), request.headers.get("Authorization", "")
+    if not (re.fullmatch(r"sha256=[0-9a-f]{64}", signatur) or re.fullmatch(r"Bearer [\x21-\x7e]{16,200}", ausweis)):
+        return web.json_response({"fehler": "Unterschrift fehlt"}, status=401)
+    jetzt, wer = time.time(), _adresse(request)
+    zeiten = [t for t in app[K_BRIEFE].get(wer, []) if jetzt - t < 60]
+    if len(zeiten) >= 30:
+        return web.json_response({"fehler": "zu viele Lieferungen"}, status=429)
+    app[K_BRIEFE][wer] = zeiten + [jetzt]
+    if len(app[K_BRIEFE]) > 500:
+        app[K_BRIEFE].clear()
+    zugang = _zugang(app, "assistent", ("token",))
+    if zugang is None:
+        return web.json_response({"fehler": "Der Notiz-Assistent ist nicht verbunden."}, status=503)
+    inhalt = bytearray()
+    async for stueck in request.content.iter_chunked(65536):
+        inhalt.extend(stueck)
+        if len(inhalt) > assistent.MAX_LIEFERUNG:
+            return web.json_response({"fehler": "zu groß"}, status=413)
+    if not inhalt:
+        return web.json_response({"fehler": "leer"}, status=400)
+    status, antwort = await assistent.lieferung_weitergeben(zugang[0], bytes(inhalt), signatur, ausweis)
+    meintag._merker.clear()
+    return web.Response(body=antwort, status=status, content_type="application/json", charset="utf-8")
+
+
 async def _seite_finanzen(request: web.Request, modul: module.Modul) -> web.Response:
     zugang = _zugang(request.app, "assistent", ("token",))
     daten, fehler = None, ""
@@ -770,6 +804,7 @@ def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, er
     app[K_ABLAGE] = Ablage(db, einst.daten, einst.hauptschluessel)
     app[K_ERK] = Erkundung(db, einst.docker_url, erkundung_ziele, erkundung_ports)
     app[K_LAUF] = lauf or {}
+    app[K_BRIEFE] = {}
     plaene.unterbrochene_markieren(db)
     app[K_JINJA] = jinja2.Environment(
         loader=jinja2.FileSystemLoader(PAKET / "templates"), autoescape=True, trim_blocks=True, lstrip_blocks=True
@@ -789,6 +824,7 @@ def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, er
         web.get("/api/dienste", api_dienste),
         web.get("/api/erkundung", api_erkundung),
         web.get("/api/tag", api_tag),
+        web.post(BRIEFKASTEN, briefkasten),
         web.get("/api/dokumente", api_dokumente),
         web.get("/api/dokumente/suche", api_dokumente_suche),
         web.get("/m/dokumente/pdf/{nr:\\d+}", dokument_datei),

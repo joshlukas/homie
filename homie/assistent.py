@@ -229,3 +229,24 @@ async def entscheid(basis: str, token: str, art: str, kennung: str, annehmen: bo
                 return False, str(antwort.get("fehler") or f"Fehler {r.status}")[:200]
     except (aiohttp.ClientError, asyncio.TimeoutError, OSError, ValueError):
         return False, "Der Notiz-Assistent ist gerade nicht erreichbar."
+
+
+MAX_LIEFERUNG = 12_000_000
+
+
+async def lieferung_weitergeben(basis: str, inhalt: bytes, signatur: str, ausweis: str) -> tuple[int, bytes]:
+    """Reicht eine Lieferung der Gesundheits-App vom Handy unverändert an den Assistenten weiter.
+
+    Homie kennt das Geheimnis der App nicht und braucht es nicht: Die App unterschreibt ihre Lieferung,
+    und der Assistent prüft die Unterschrift. Homie ist nur der Briefkasten."""
+    kopf = {"Content-Type": "application/json"}
+    if signatur:
+        kopf["X-Signature"] = signatur
+    if ausweis:
+        kopf["Authorization"] = ausweis
+    try:
+        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False), timeout=aiohttp.ClientTimeout(total=45)) as s:
+            async with s.post(basis.rstrip("/") + "/api/health-webhook", data=inhalt, headers=kopf, allow_redirects=False) as r:
+                return r.status, await r.read()
+    except (aiohttp.ClientError, asyncio.TimeoutError, OSError):
+        return 502, b'{"fehler": "Der Notiz-Assistent ist gerade nicht erreichbar."}'
