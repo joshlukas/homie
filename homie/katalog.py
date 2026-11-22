@@ -28,6 +28,7 @@ class Eintrag:
     felder: tuple[Feld, ...] = ()
     schaltet_frei: str = ""
     farbe: str = "#8b7cff"
+    karte: bool = True        # False: erscheint nur im Netzplan, nicht als Karte zum Verbinden
 
 
 _BESCHRIFTUNG = "Zugriffstoken"
@@ -90,7 +91,8 @@ KATALOG: tuple[Eintrag, ...] = (
     Eintrag("adguard", "dns", "AdGuard Home", "Werbefilter für das Heimnetz", (3000, 80), ("adguard home",), farbe="#3ddc97"),
     Eintrag("npm", "proxy", "Nginx Proxy Manager", "Leitet Namen auf Dienste weiter", (81,), ("nginx proxy manager",), farbe="#ff8a6b"),
     Eintrag("vaultwarden", "passwoerter", "Vaultwarden", "Passwort-Tresor", (80, 8085, 8080), ("vaultwarden",), farbe="#5b9dff"),
-    Eintrag("unifi", "router", "UniFi", "Router und Netzwerkverwaltung", (443, 8443), ("unifi",), farbe="#5b9dff"),
+    Eintrag("unifi", "router", "UniFi", "Router und Netzwerkverwaltung", (443, 8443, 80), ("<title>unifi os</title>", "<title>unifi network</title>"), farbe="#5b9dff"),
+    Eintrag("unifi-kamera", "kamera", "UniFi-Kamera", "Überwachungskamera", (80, 443), ("<title>unifi protect</title>",), karte=False),
     Eintrag("fritzbox", "router", "FRITZ!Box", "Router", (80, 443), ("fritz!box",), farbe="#ff6b8b"),
 )
 

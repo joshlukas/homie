@@ -24,7 +24,7 @@ import aiohttp
 from yarl import URL
 
 from .db import Datenbank
-from .katalog import KATALOG, NUR_PORT, TLS_ZUERST, WEB_PORTS, Eintrag, alle_ports
+from .katalog import KATALOG, NUR_PORT, TLS_ZUERST, WEB_PORTS, Eintrag, alle_ports, eintrag
 
 _TITEL = re.compile(r"<title[^>]*>(.*?)</title>", re.I | re.S)
 _KEIN_HEIMNETZ = ("lo", "docker", "br-", "veth", "virbr", "tailscale", "wg", "tun", "zt")
@@ -240,7 +240,11 @@ async def erkunden(adressen: list[str], ports: tuple[int, ...], docker_url: str,
 
     # Derselbe Dienst auf mehreren Ports eines Geräts (z. B. 80 und 443) zählt einmal.
     gesehen: set[tuple[str, str]] = set()
-    for f in sorted((f for f in funde if f), key=lambda f: (f.ip, f.kennung == "", f.port)):
+    def rang(f: Fund) -> tuple:
+        e = eintrag(f.kennung)   # der im Katalog zuerst genannte Port ist die eigentliche Adresse des Dienstes
+        return (f.ip, f.kennung == "", e.ports.index(f.port) if e and f.port in e.ports else 99, f.port)
+
+    for f in sorted((f for f in funde if f), key=rang):
         schluessel = (f.ip, f.kennung or f"{f.art}:{f.name}")
         if schluessel not in gesehen:
             gesehen.add(schluessel)
@@ -250,6 +254,11 @@ async def erkunden(adressen: list[str], ports: tuple[int, ...], docker_url: str,
 
 # ---------- Ablegen im Datenordner ----------
 
+def _als_karte(f: Fund) -> bool:
+    e = eintrag(f.kennung)
+    return e is not None and e.karte
+
+
 def speichern(db: Datenbank, erg: Ergebnis) -> dict:
     jetzt = int(time.time())
     for ip in erg.eigene:   # der eigene Rechner gehört immer in den Plan, auch ohne offene Ports
@@ -257,7 +266,7 @@ def speichern(db: Datenbank, erg: Ergebnis) -> dict:
     db.ausfuehren("DELETE FROM geraet")
     for ip, g in erg.geraete.items():
         sonst = [{"port": f.port, "art": f.art, "name": f.name, "adresse": f.adresse}
-                 for f in erg.funde if f.ip == ip and not f.kennung]
+                 for f in erg.funde if f.ip == ip and not _als_karte(f)]
         db.ausfuehren("INSERT INTO geraet (ip, name, mac, ports, sonstiges, gesehen) VALUES (?,?,?,?,?,?)",
                       (ip, g["name"], g["mac"], json.dumps(g["ports"]), json.dumps(sonst), jetzt))
     db.ausfuehren("DELETE FROM container")
@@ -268,7 +277,7 @@ def speichern(db: Datenbank, erg: Ergebnis) -> dict:
     vorhanden = {(z["art"], json.loads(z["details"]).get("ip", "")): z for z in db.alle("SELECT id, art, details FROM dienst")}
     neu = 0
     for f in erg.funde:
-        if not f.kennung:
+        if not _als_karte(f):
             continue
         geraet = erg.geraete.get(f.ip, {}).get("name", "")
         details = json.dumps({"ip": f.ip, "port": f.port, "kennung": f.kennung, "geraet": geraet, "gesehen": jetzt})
@@ -279,7 +288,12 @@ def speichern(db: Datenbank, erg: Ergebnis) -> dict:
             neu += 1
             db.ausfuehren("INSERT INTO dienst (art, name, adresse, zustand, gefunden, details) VALUES (?,?,?,'gefunden',?,?)",
                           (f.art, f.name, f.adresse, jetzt, details))
-    bilanz = {"zeit": jetzt, "geraete": len(erg.geraete), "dienste": sum(1 for f in erg.funde if f.kennung), "neu": neu,
+    # Was nie verbunden wurde und jetzt nicht mehr antwortet, verschwindet wieder.
+    # Verbundene und ausgeblendete Dienste bleiben und werden als „nicht mehr erreichbar“ markiert.
+    for z in db.alle("SELECT id, details FROM dienst WHERE zustand='gefunden'"):
+        if json.loads(z["details"]).get("gesehen", 0) < jetzt:
+            db.ausfuehren("DELETE FROM dienst WHERE id=?", (z["id"],))
+    bilanz = {"zeit": jetzt, "geraete": len(erg.geraete), "dienste": sum(1 for f in erg.funde if _als_karte(f)), "neu": neu,
               "container": len(erg.container), "docker": erg.docker, "router": erg.router, "eigene": erg.eigene}
     db.ausfuehren("INSERT INTO merk (name, wert) VALUES ('erkundung', ?) ON CONFLICT(name) DO UPDATE SET wert=excluded.wert",
                   (json.dumps(bilanz),))
