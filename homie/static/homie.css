@@ -1,5 +1,5 @@
 /* Homie – Glas-Design: dunkles Nachtblau (nie reines Schwarz), Flächen als Milchglas über farbigem Licht.
-   Keine Schriften oder Dateien von außen: alles kommt aus diesem Ordner. */
+   Keine Schriften oder Dateien von außen: alles kommt aus diesem Ordner (die Schriften aus static/schrift). */
 :root {
   --bg: #121428;
   --surface: #1c1f3d;
@@ -18,7 +18,8 @@
   --unscharf: blur(22px) saturate(160%);
   --shadow: 0 22px 44px -26px rgba(4, 4, 24, 0.9), 0 1px 0 rgba(255, 255, 255, 0.06) inset;
   --radius: 18px;
-  --schrift: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --schrift: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --titel: "Outfit", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   color-scheme: dark;
 }
 
@@ -36,7 +37,8 @@ body {
 }
 a { color: #9db4ff; }
 ::selection { background: rgba(139, 124, 255, 0.45); }
-h1, h2, h3 { margin: 0; letter-spacing: -0.02em; line-height: 1.2; }
+h1, h2, h3 { margin: 0; letter-spacing: -0.02em; line-height: 1.2; font-family: var(--titel); }
+.marke b, .kachel b, .logo { font-family: var(--titel); }
 h1 { font-size: clamp(26px, 5vw, 34px); font-weight: 700; }
 h3 { font-size: 16px; font-weight: 600; letter-spacing: 0; }
 p { margin: 0; }

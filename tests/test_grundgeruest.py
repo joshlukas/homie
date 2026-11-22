@@ -91,6 +91,14 @@ class Web(unittest.IsolatedAsyncioTestCase):
         z = await (await self.c.get("/api/zustand")).json()
         self.assertEqual(z["module_aktiv"], ["uebersicht", "onboarding"])
         self.assertEqual(z["erkundung"], {"docker": "aus"})
+        # Schriften liefert Homie selbst aus – keine Anfrage ins Internet
+        self.assertIn('href="/static/schrift/schrift.css"', text)
+        r = await self.c.get("/static/schrift/schrift.css")
+        regeln = await r.text()
+        self.assertEqual((r.status, regeln.count("@font-face"), "http" in regeln), (200, 4, False))
+        for datei in ("outfit-latin.woff2", "plus-jakarta-sans-latin.woff2"):
+            r = await self.c.get(f"/static/schrift/{datei}")
+            self.assertEqual((r.status, (await r.read())[:4]), (200, b"wOF2"))
         # frühere Adressen (Lesezeichen, App-Symbol) führen zur heutigen Seite – auch sie nur mit Anmeldung
         for alt, neu in (("/aufnahme", "/m/aufnahme"), ("/dokumente/", "/m/dokumente"), ("/blueprint", "/s/blueprint"), ("/mein-tag", "/m/tag")):
             r = await self.c.get(alt, allow_redirects=False)
