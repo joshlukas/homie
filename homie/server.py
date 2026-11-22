@@ -213,6 +213,15 @@ async def start(request: web.Request) -> web.Response:
     raise web.HTTPSeeOther("/uebersicht" if _dienste(request.app) else "/onboarding")
 
 
+# Adressen, unter denen Seiten früher erreichbar waren (Lesezeichen, App-Symbol auf dem Handy) → heutige Seite
+FRUEHER = {"/mein-tag": "/m/tag", "/index.html": "/m/tag", "/dokumente": "/m/dokumente", "/aufnahme": "/m/aufnahme", "/blueprint": "/s/blueprint",
+           "/blueprint.html": "/s/blueprint"}
+
+
+async def frueher(request: web.Request) -> web.Response:
+    raise web.HTTPSeeOther(FRUEHER[request.path.rstrip("/") or "/"])
+
+
 async def _erreichbar(sitzung: aiohttp.ClientSession, adresse: str) -> tuple[bool, int]:
     beginn = time.monotonic()
     try:
@@ -816,6 +825,7 @@ def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, er
         web.post("/logout", logout),
         web.get("/onboarding", onboarding),
         web.get("/uebersicht", uebersicht),
+        *[web.get(weg + zusatz, frueher) for weg in FRUEHER for zusatz in ("", "/") if not weg.endswith(".html") or not zusatz],
         web.get("/s/{name}", eigene_seite),
         web.post("/m/entscheid/{art:finanzen|training|profil}", entscheid),
         web.get("/m/{id}", modulseite),

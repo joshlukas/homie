@@ -48,7 +48,7 @@ class Web(unittest.IsolatedAsyncioTestCase):
     async def test_ohne_anmeldung_keine_seite_und_keine_api(self):
         await self.einrichten()
         self.c.session.cookie_jar.clear()
-        for pfad in ("/", "/onboarding", "/onboarding?beispiel=1", "/m/tag", "/gibtsnicht", "/einrichten"):
+        for pfad in ("/", "/onboarding", "/onboarding?beispiel=1", "/m/tag", "/gibtsnicht", "/einrichten", "/aufnahme", "/blueprint"):
             r = await self.c.get(pfad, allow_redirects=False)
             self.assertEqual((r.status, r.headers["Location"]), (303, "/login"), pfad)
         for pfad in ("/api/zustand", "/api/module", "/api/dienste", "/api/gibtsnicht"):
@@ -91,6 +91,10 @@ class Web(unittest.IsolatedAsyncioTestCase):
         z = await (await self.c.get("/api/zustand")).json()
         self.assertEqual(z["module_aktiv"], ["uebersicht", "onboarding"])
         self.assertEqual(z["erkundung"], {"docker": "aus"})
+        # frühere Adressen (Lesezeichen, App-Symbol) führen zur heutigen Seite – auch sie nur mit Anmeldung
+        for alt, neu in (("/aufnahme", "/m/aufnahme"), ("/dokumente/", "/m/dokumente"), ("/blueprint", "/s/blueprint"), ("/mein-tag", "/m/tag")):
+            r = await self.c.get(alt, allow_redirects=False)
+            self.assertEqual((r.status, r.headers["Location"]), (303, neu), alt)
         # Abmelden ohne Sicherheitsmarke wird abgelehnt, mit Marke klappt es
         self.assertEqual((await self.c.post("/logout", allow_redirects=False)).status, 403)
         marke = text.split('name="csrf" value="')[1].split('"')[0]
