@@ -7,9 +7,9 @@ name: homie
 
 services:
   homie:
-    build: .
-    image: homie:lokal
-    pull_policy: build            # wird immer aus diesem Repository gebaut, nie von außen geladen
+    image: ghcr.io/joshlukas/homie:latest   # fertiges Image, von GitHub aus diesem Repository gebaut
+    build: .                                 # Rückfall: lässt sich das Image nicht laden, wird hier gebaut
+    pull_policy: always                      # bei jedem Start nach einem neueren Image sehen
     container_name: homie
     restart: unless-stopped
     # Im Heimnetz des Rechners (kein abgeschottetes Docker-Netz): nur so kann Homie später
