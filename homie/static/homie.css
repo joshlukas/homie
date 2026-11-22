@@ -182,3 +182,9 @@ details.mehr .liste { padding: 0; margin-top: 6px; }
 .dienste a:hover { text-decoration: underline; }
 details.container { margin-top: 10px; }
 details.container > summary { cursor: pointer; color: var(--muted); font-size: 13.5px; }
+
+/* Viele Karten auf einmal: ohne Unschärfe, sonst wird die Seite auf Handys und schwachen Rechnern träge. */
+.raster .glas, .plan .glas, .geraet {
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  background: linear-gradient(155deg, rgba(52, 56, 104, 0.72) 0%, rgba(32, 35, 70, 0.78) 45%, rgba(28, 31, 62, 0.82) 100%);
+}
