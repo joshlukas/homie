@@ -89,7 +89,7 @@ async def _hinaus(request):
     raise web.HTTPFound("http://nach-draussen.invalid/")
 
 
-DOKUMENTE = [{"id": n, "title": f"Beleg {n}", "correspondent": 1, "document_type": 2, "tags": [3], "created": "2026-03-0%d" % n, "page_count": 2}
+DOKUMENTE = [{"id": n, "title": f"Beleg {n}", "correspondent": 1, "document_type": 2, "tags": [3, 4], "added": "2026-03-10T08:00:00+01:00", "created": "2026-03-0%d" % n, "page_count": 2}
              for n in range(1, 4)]
 
 
@@ -107,12 +107,19 @@ def _pl(antwort):
 
 async def _pl_dokumente(request):
     q = request.query.get("query", "")
-    treffer = [d for d in DOKUMENTE if q.lower() in d["title"].lower()]
-    return web.json_response({"count": len(treffer), "results": treffer})
+    treffer = [{**d, "__search_hit__": {"highlights": f"Zahlbar bis <span class=\"match\">{q}</span> ohne Abzug"}} if q else d
+               for d in DOKUMENTE if q.lower() in d["title"].lower()]
+    return web.json_response({"count": len(treffer), "results": treffer, "next": None})
 
 
 async def _pl_namen(request):
-    return web.json_response({"results": [{"id": 1, "name": "Stadtwerke"}, {"id": 2, "name": "Rechnung"}, {"id": 3, "name": "Wohnung"}]})
+    return web.json_response({"results": [{"id": 1, "name": "Stadtwerke"}, {"id": 2, "name": "Rechnung"}, {"id": 3, "name": "Wohnung", "is_inbox_tag": True},
+                                          {"id": 4, "name": "ai-processed"}]})
+
+
+async def _pl_pdf(request):
+    return web.Response(body=b"%PDF-1.7 " + b"x" * 200_000, content_type="application/pdf",
+                        headers={"Content-Disposition": 'attachment; filename="Beleg Nr. 2 (Kopie).pdf"'})
 
 
 async def _pl_zahlen(request):
@@ -125,7 +132,7 @@ async def _pl_bild(request):
 
 PAPERLESS = {"/": _pl_start, "/api/documents/": _pl(_pl_dokumente), "/api/statistics/": _pl(_pl_zahlen),
              "/api/correspondents/": _pl(_pl_namen), "/api/document_types/": _pl(_pl_namen), "/api/tags/": _pl(_pl_namen),
-             "/api/documents/{nr}/thumb/": _pl(_pl_bild)}
+             "/api/documents/{nr}/thumb/": _pl(_pl_bild), "/api/documents/{nr}/preview/": _pl(_pl_pdf), "/api/documents/{nr}/download/": _pl(_pl_pdf)}
 
 
 ABGEGEBEN = []
@@ -522,25 +529,47 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         # vor dem Verbinden: Modul und Vorschau gesperrt
         self.assertEqual((await self.c.get("/m/dokumente")).status, 404)
         self.assertEqual((await self.c.get("/m/dokumente/vorschau/1")).status, 404)
+        self.assertEqual((await self.c.get("/api/dokumente")).status, 404)
         r = await self.c.post(f"/dienst/{d['id']}/verbinden", data={"csrf": self.csrf, "token": GUT}, allow_redirects=False)
         self.assertEqual(r.status, 303)
+        for pfad in ("/api/dokumente", "/m/dokumente/pdf/2"):
+            self.assertEqual((await self.c.get(pfad)).status, 200, pfad)
         r = await self.c.get("/m/dokumente")
         text = await r.text()
         self.assertEqual(r.status, 200)
-        for erwartet in ("Beleg 1", "Beleg 3", "Stadtwerke · Rechnung · 03.03.2026", "Wohnung", "Neueste Dokumente", "/m/dokumente/vorschau/2",
-                         f"http://127.0.0.1:{self.paperless}/documents/1/details"):
+        for erwartet in ("/static/dokumente.js", "/static/dokumente.css", 'id="rolle"', 'id="lineal"', 'id="leser"', 'href="/m/dokumente" aria-current="page"'):
             self.assertIn(erwartet, text)
         self.assertNotIn(GUT, text)
-        text = await (await self.c.get("/m/dokumente?q=beleg+2")).text()
-        self.assertIn("Beleg 2", text)
-        self.assertNotIn("Beleg 3", text)
-        self.assertIn("Nichts gefunden", await (await self.c.get("/m/dokumente?q=gibtsnicht")).text())
+        for datei in ("dokumente.js", "dokumente.css"):
+            r = await self.c.get(f"/static/{datei}")
+            self.assertEqual(r.status, 200)
+            self.assertNotIn("http", (await r.text()).replace("https-", ""))    # nichts von außen, keine Bibliothek aus dem Netz
+        # die Liste aller Dokumente: Namen aufgelöst, Arbeitsmarke ausgeblendet, Posteingang erkannt
+        d = await (await self.c.get("/api/dokumente")).json()
+        self.assertEqual((d["anzahl"], d["archiv"]), (3, f"http://127.0.0.1:{self.paperless}"))
+        self.assertEqual(d["dokumente"][0], {"id": 1, "titel": "Beleg 1", "datum": "2026-03-01", "neu": "2026-03-10", "von": "Stadtwerke", "art": "Rechnung",
+                                             "tags": ["Wohnung"], "seiten": 2, "eingang": True})
+        self.assertNotIn(GUT, json.dumps(d))
+        # Volltextsuche mit Auszug (ohne HTML aus dem Archiv)
+        t = await (await self.c.get("/api/dokumente/suche?q=beleg+2")).json()
+        self.assertEqual(t, {"anzahl": 1, "treffer": [{"id": 2, "auszug": "Zahlbar bis beleg 2 ohne Abzug"}]})
+        self.assertEqual((await (await self.c.get("/api/dokumente/suche?q=x")).json())["treffer"], [])
+        # Vorschaubild, PDF im Leser (nur in Homies eigenem Rahmen) und Herunterladen mit bereinigtem Namen
         r = await self.c.get("/m/dokumente/vorschau/2")
         self.assertEqual((r.status, r.content_type), (200, "image/webp"))
+        r = await self.c.get("/m/dokumente/pdf/2")
+        self.assertEqual((r.status, r.content_type, len(await r.read())), (200, "application/pdf", 200_009))
+        self.assertTrue(r.headers["Content-Disposition"].startswith("inline"))
+        self.assertEqual((r.headers["Content-Security-Policy"], r.headers["X-Frame-Options"]), ("frame-ancestors 'self'", "SAMEORIGIN"))
+        r = await self.c.get("/m/dokumente/pdf/2?laden=1")
+        self.assertEqual(r.headers["Content-Disposition"], "attachment; filename*=UTF-8''Beleg%20Nr.%202%20(Kopie).pdf")
+        self.assertEqual((await self.c.get("/m/dokumente/pdf/abc")).status, 404)
         # ohne Anmeldung: nichts davon
         self.c.session.cookie_jar.clear()
-        for pfad in ("/m/dokumente", "/m/dokumente/vorschau/2"):
+        for pfad in ("/m/dokumente", "/m/dokumente/vorschau/2", "/m/dokumente/pdf/2"):
             self.assertEqual((await self.c.get(pfad, allow_redirects=False)).status, 303, pfad)
+        for pfad in ("/api/dokumente", "/api/dokumente/suche?q=beleg"):
+            self.assertEqual((await self.c.get(pfad)).status, 401, pfad)
 
 
 class Regeln(unittest.TestCase):

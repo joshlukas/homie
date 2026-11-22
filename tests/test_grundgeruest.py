@@ -126,9 +126,10 @@ class Web(unittest.IsolatedAsyncioTestCase):
         self.assertIn("dokumente", aktiv())
         text = await (await self.c.get("/onboarding")).text()
         self.assertIn('href="/m/dokumente"', text)
-        r = await self.c.get("/m/dokumente")     # freigeschaltet, aber hier gibt es kein echtes Archiv
+        self.assertEqual((await self.c.get("/m/dokumente")).status, 200)     # freigeschaltet; das Gerüst der Seite
+        r = await self.c.get("/api/dokumente")                                # … aber hier gibt es kein echtes Archiv
         self.assertEqual(r.status, 502)
-        self.assertIn("nicht erreichbar", await r.text())
+        self.assertIn("nicht erreichbar", (await r.json())["fehler"])
         self.assertNotIn("geheim-123", await (await self.c.get("/api/dienste")).text())
 
 

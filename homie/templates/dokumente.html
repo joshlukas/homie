@@ -1,50 +1,60 @@
-{% extends "basis.html" %}
-{% block titel %}Homie – Dokumente{% endblock %}
-{% block inhalt %}
-<section class="kopf">
-  <h1>Dokumente</h1>
-  <p class="leiser">Dein Archiv, direkt durchsuchbar. Homie liest nur – geändert wird im Archiv selbst.</p>
-</section>
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121530">
+<meta name="robots" content="noindex, nofollow">
+<title>Homie – Dokumente</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/mein-tag.css">
+<link rel="stylesheet" href="/static/dokumente.css">
+<script src="/static/dokumente.js" defer></script>
+</head>
+<body class="dokseite">
+<nav class="menue" aria-label="Hauptmenü"><a class="marke" href="/"><i></i><span>Homie</span></a><div class="tabs">
+{%- for m in menue %}<a href="{{ m.pfad }}"{% if pfad == m.pfad %} aria-current="page"{% endif %}>{{ m.titel }}</a>{% endfor %}
+{%- for s in eigene_seiten %}<a href="/s/{{ s.id }}">{{ s.titel }}</a>{% endfor %}</div>
+<form method="post" action="/logout" class="abmelden"><input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit">Abmelden</button></form></nav>
 
-<form method="get" action="/m/dokumente" class="suche" role="search">
-  <label for="q" class="unsichtbar">Suche</label>
-  <input id="q" name="q" type="text" value="{{ suche }}" placeholder="Wonach suchst du? Zum Beispiel: Rechnung Versicherung 2025" autocomplete="off">
-  <button type="submit">Suchen</button>
-  {% if suche %}<a class="knopf leise" href="/m/dokumente">Zurücksetzen</a>{% endif %}
-</form>
-
-{% if fehler %}
-<div class="glas leer"><h3>Gerade keine Dokumente</h3><p class="meldung" role="alert">{{ fehler }}</p></div>
-{% else %}
-<div class="kacheln">
-  <div class="glas kachel"><b>{{ daten.gesamt }}</b><span>Dokumente im Archiv</span></div>
-  <div class="glas kachel"><b>{{ daten.posteingang }}</b><span>im Posteingang</span></div>
-  {% if suche %}<div class="glas kachel"><b>{{ daten.treffer }}</b><span>Treffer für „{{ suche }}“</span></div>{% endif %}
+<div class="kopf">
+  <div class="titel"><h1>Dokumente</h1><p id="sub">Lade …</p></div>
+  <div class="suchfeld">
+    <label for="suche" class="unsichtbar">Dokumente durchsuchen</label>
+    <input id="suche" type="search" placeholder="Suchen – Titel, Absender, Inhalt" autocomplete="off" spellcheck="false" enterkeyhint="search">
+    <kbd title="Taste / springt ins Suchfeld">/</kbd>
+  </div>
+  <button id="filterknopf" type="button" class="knopf" aria-expanded="false" aria-controls="filter">Filter</button>
+  <div class="seg" role="group" aria-label="Ansicht">
+    <button type="button" data-ansicht="strom" aria-pressed="true">Stream</button><button type="button" data-ansicht="raster" aria-pressed="false">Raster</button>
+  </div>
 </div>
+<div id="aktiv" class="aktiv" hidden></div>
+<div id="filter" class="filter" hidden></div>
 
-<h2 class="gruppe"><span>{{ 'Treffer' if suche else 'Neueste Dokumente' }}</span></h2>
-{% if daten.dokumente %}
-<div class="raster belege">
-  {% for d in daten.dokumente %}
-  <a class="glas beleg" href="{{ d.link }}" target="_blank" rel="noopener noreferrer">
-    <img src="/m/dokumente/vorschau/{{ d.id }}" alt="" loading="lazy" width="96" height="136">
-    <div>
-      <h3>{{ d.titel }}</h3>
-      <p class="leiser">{{ [d.korrespondent, d.art, d.datum] | select | join(' · ') }}</p>
-      {% if d.schlagwoerter %}<p class="marken">{% for s in d.schlagwoerter %}<span class="chip">{{ s }}</span>{% endfor %}</p>{% endif %}
-    </div>
-  </a>
-  {% endfor %}
+<p id="meldung" class="meldung-gross">Lade Dokumente …</p>
+
+<div class="buehne" id="buehne" hidden>
+  <div class="lineal" id="lineal" role="slider" aria-label="Zeitachse der Dokumente" tabindex="0"><div class="zeiger" id="zeiger" hidden></div></div>
+  <div class="rolle" id="rolle" tabindex="0" role="feed" aria-label="Dokumente, neueste zuerst"></div>
+  <div class="pfeile"><button id="hoch" type="button" aria-label="Neueres Dokument">▲</button><button id="runter" type="button" aria-label="Älteres Dokument">▼</button></div>
 </div>
-{% if daten.seiten > 1 %}
-<nav class="blaettern" aria-label="Seiten">
-  {% if daten.seite > 1 %}<a class="knopf leise" href="/m/dokumente?{{ {'q': suche, 'seite': daten.seite - 1} | urlencode }}">Zurück</a>{% endif %}
-  <span class="leiser">Seite {{ daten.seite }} von {{ daten.seiten }}</span>
-  {% if daten.seite < daten.seiten %}<a class="knopf leise" href="/m/dokumente?{{ {'q': suche, 'seite': daten.seite + 1} | urlencode }}">Weiter</a>{% endif %}
-</nav>
-{% endif %}
-{% else %}
-<div class="glas leer"><h3>Nichts gefunden</h3><p class="leiser">{{ 'Zu dieser Suche gibt es keine Dokumente.' if suche else 'Das Archiv ist noch leer.' }}</p></div>
-{% endif %}
-{% endif %}
-{% endblock %}
+<div class="wand" id="wand" hidden></div>
+
+<dialog id="leser" aria-label="Dokument lesen">
+  <div class="leserkopf">
+    <div><b id="lesertitel"></b><small id="leserzeile"></small></div>
+    <a id="leserladen" class="knopf" download>Herunterladen</a>
+    <a id="leserarchiv" class="knopf" target="_blank" rel="noopener noreferrer">Im Archiv</a>
+    <button id="leserzu" type="button" class="knopf stark" aria-label="Schließen">Schließen</button>
+  </div>
+  <iframe id="leserblatt" title="Dokument"></iframe>
+</dialog>
+
+<div id="hilfe" class="hilfe" hidden>
+  <b>Tasten</b>
+  <span><kbd>↓</kbd><kbd>↑</kbd> nächstes / voriges</span><span><kbd>Enter</kbd> lesen</span><span><kbd>/</kbd> suchen</span>
+  <span><kbd>G</kbd> Stream / Raster</span><span><kbd>F</kbd> Filter</span><span><kbd>Pos1</kbd><kbd>Ende</kbd> neuestes / ältestes</span><span><kbd>?</kbd> diese Hilfe</span>
+</div>
+</body>
+</html>

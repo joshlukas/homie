@@ -48,7 +48,7 @@ Ein vorgeschlagener Plan ist ein Entwurf. Lesen, bestätigen und ausführen kann
 | `homie/meintag.py` | trägt für „Mein Tag“ alles in einer Antwort zusammen (`/api/tag`); die Seite dazu ist `static/mein-tag.js` |
 | `homie/gesundheit.py`, `homie/tag.py` | Modul Gesundheit: liest Home Assistant; Zeitzone |
 | `homie/assistent.py` | Module Aufnahme, Finanzen, Assistent: lesen den Notiz-Assistenten; geben neue Aufnahmen und Entscheidungen zu Vorschlägen an ihn weiter |
-| `homie/dokumente.py` | Modul Dokumente: liest Paperless-ngx (nur lesend, nichts wird gespeichert) |
+| `homie/dokumente.py` | Modul Dokumente: liest Paperless-ngx (nur lesend, nichts wird gespeichert); die Seite dazu ist `static/dokumente.js` |
 | `homie/proxmox.py` | Proxmox lesen (VMs, Container, Speicher) |
 | `homie/plaene.py` | Pläne entwerfen und prüfen; enthält bewusst keinen schreibenden Aufruf |
 | `homie/ausfuehren.py` | einzige Stelle, die an Proxmox schreibt: legt nach Bestätigung genau eine neue VM an, löscht nie |

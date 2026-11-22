@@ -346,18 +346,49 @@ def _zugang(app: web.Application, art: str, felder: tuple[str, ...]) -> tuple[st
 
 
 async def _seite_dokumente(request: web.Request, modul: module.Modul) -> web.Response:
-    zugang = _zugang(request.app, "dokumente", ("token",))
-    suche = request.query.get("q", "").strip()[:200]
+    """Nur das Gerüst; die Dokumente kommen über /api/dokumente. Das PDF im Leser ist ein Rahmen derselben Seite."""
+    return _seite(request, "dokumente.html", modul=modul)
+
+
+def _archiv(request: web.Request) -> tuple[str, dict[str, str]]:
+    aktiv = any(s.aktiv and s.modul.id == "dokumente" for s in module.stand(request.app[K_DB], request.app[K_ABLAGE]))
+    zugang = _zugang(request.app, "dokumente", ("token",)) if aktiv else None
+    if zugang is None:
+        raise web.HTTPNotFound()
+    return zugang
+
+
+async def api_dokumente(request: web.Request) -> web.Response:
+    zugang = _archiv(request)
     try:
-        seite = max(1, int(request.query.get("seite", "1")))
-    except ValueError:
-        seite = 1
-    daten, fehler = None, ""
-    try:
-        daten = await dokumente.uebersicht(zugang[0], zugang[1]["token"], suche, seite)
+        daten = await dokumente.alle(zugang[0], zugang[1]["token"], frisch=request.query.get("frisch") == "1")
     except dokumente.DokumenteFehler as e:
-        fehler = str(e)
-    return _seite(request, "dokumente.html", status=200 if daten else 502, modul=modul, suche=suche, daten=daten, fehler=fehler)
+        return web.json_response({"fehler": str(e)}, status=502)
+    return web.json_response(daten, dumps=lambda o: json.dumps(o, ensure_ascii=False))
+
+
+async def api_dokumente_suche(request: web.Request) -> web.Response:
+    zugang, frage = _archiv(request), request.query.get("q", "").strip()[:200]
+    if len(frage) < 2:
+        return web.json_response({"anzahl": 0, "treffer": []})
+    try:
+        return web.json_response(await dokumente.volltext(zugang[0], zugang[1]["token"], frage), dumps=lambda o: json.dumps(o, ensure_ascii=False))
+    except dokumente.DokumenteFehler as e:
+        return web.json_response({"fehler": str(e)}, status=502)
+
+
+async def dokument_datei(request: web.Request) -> web.Response:
+    zugang, laden = _archiv(request), request.query.get("laden") == "1"
+    try:
+        inhalt, art, name = await dokumente.datei(zugang[0], zugang[1]["token"], int(request.match_info["nr"]), laden)
+    except dokumente.DokumenteFehler:
+        raise web.HTTPNotFound()
+    name = re.sub(r"[^\w.\- ()äöüÄÖÜß]", "_", name)[:120] or "dokument.pdf"
+    return web.Response(body=inhalt, content_type=art, headers={
+        "Content-Disposition": f"{'attachment' if laden else 'inline'}; filename*=UTF-8''{URL.build(path=name).raw_path}",
+        "Cache-Control": "private, max-age=600",
+        # Das PDF darf im Leser dieser Seite erscheinen – nirgends sonst.
+        "Content-Security-Policy": "frame-ancestors 'self'", "X-Frame-Options": "SAMEORIGIN"})
 
 
 async def _seite_tag(request: web.Request, modul: module.Modul) -> web.Response:
@@ -476,15 +507,12 @@ async def aufnahme_senden(request: web.Request) -> web.Response:
 
 
 async def dokument_vorschau(request: web.Request) -> web.Response:
-    aktiv = any(s.aktiv and s.modul.id == "dokumente" for s in module.stand(request.app[K_DB], request.app[K_ABLAGE]))
-    zugang = _zugang(request.app, "dokumente", ("token",)) if aktiv else None
-    if zugang is None:
-        raise web.HTTPNotFound()
+    zugang = _archiv(request)
     try:
         bild, art = await dokumente.vorschau(zugang[0], zugang[1]["token"], int(request.match_info["nr"]))
     except dokumente.DokumenteFehler:
         raise web.HTTPNotFound()
-    return web.Response(body=bild, content_type=art, headers={"Cache-Control": "private, max-age=3600"})
+    return web.Response(body=bild, content_type=art, headers={"Cache-Control": "private, max-age=86400, immutable"})
 
 
 def _dienst(request: web.Request) -> dict:
@@ -761,6 +789,9 @@ def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, er
         web.get("/api/dienste", api_dienste),
         web.get("/api/erkundung", api_erkundung),
         web.get("/api/tag", api_tag),
+        web.get("/api/dokumente", api_dokumente),
+        web.get("/api/dokumente/suche", api_dokumente_suche),
+        web.get("/m/dokumente/pdf/{nr:\\d+}", dokument_datei),
         web.post("/api/tag/entscheid/{art:finanzen|training|profil}", api_tag_entscheid),
         web.get("/api/netzplan", api_netzplan),
         web.post("/erkundung/start", erkundung_start),

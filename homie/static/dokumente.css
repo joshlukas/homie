@@ -1,0 +1,125 @@
+/* Dokumente – der „Dokumentstream“: ein Dokument je Bildschirm, links die Zeitachse.
+   Setzt auf dem gemeinsamen Design (mein-tag.css) auf. Bewegt wird nur über transform/opacity, damit alles flüssig bleibt. */
+html, body.dokseite { height: 100%; }
+body.dokseite { margin: 0; padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  overflow: hidden; display: flex; flex-direction: column; }
+.unsichtbar { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+kbd { display: inline-block; min-width: 20px; padding: 1px 6px; border-radius: 6px; border: 1px solid var(--border-strong); background: rgba(255, 255, 255, 0.06);
+  font: 600 11px/1.5 var(--body, inherit); color: var(--muted); text-align: center; }
+
+/* ---------- Kopf: Titel, Suche, Filter, Ansicht ---------- */
+.kopf { flex: none; display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; padding: 12px 14px 10px; }
+.kopf .titel { flex: 1 1 200px; min-width: 0; }
+.kopf h1 { margin: 0; font: 700 22px/1.15 var(--display, inherit); letter-spacing: -0.02em;
+  background: var(--g-brand); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.kopf p { margin: 2px 0 0; color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.suchfeld { position: relative; flex: 2 1 260px; max-width: 520px; }
+.suchfeld input { width: 100%; height: 42px; padding: 0 40px 0 16px; border-radius: 999px; border: 1px solid var(--border-strong);
+  background: rgba(10, 12, 32, 0.5); color: var(--text); font: 15px var(--body, inherit); outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
+.suchfeld input:focus { border-color: #8b7cff; box-shadow: 0 0 0 4px rgba(139, 124, 255, 0.2); }
+.suchfeld input::placeholder { color: var(--faint); }
+.suchfeld kbd { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.suchfeld input:focus + kbd, .suchfeld input:not(:placeholder-shown) + kbd { display: none; }
+.knopf { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 38px; padding: 0 16px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border-strong); background: var(--surface-strong); color: var(--text); font: 600 13px var(--body, inherit); text-decoration: none;
+  transition: transform 0.12s, filter 0.12s, border-color 0.12s; }
+.knopf:hover { text-decoration: none; filter: brightness(1.15); transform: translateY(-1px); }
+.knopf.stark, .knopf[aria-expanded="true"] { border: 0; background: var(--g-violet); color: #fff; box-shadow: 0 10px 20px -10px rgba(106, 92, 255, 0.95); }
+.knopf b { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: rgba(255, 255, 255, 0.22); font-size: 11px; }
+:focus-visible { outline: 2px solid #c05cff; outline-offset: 2px; }
+
+/* ---------- Filter ---------- */
+.aktiv { flex: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 8px; }
+.filter { flex: none; max-height: 42vh; overflow-y: auto; overscroll-behavior: contain; margin: 0 10px 10px; padding: 12px 14px; border-radius: 14px;
+  background: var(--glas, var(--surface-strong)); border: 1px solid var(--glas-kante, var(--border)); }
+.filter h2 { margin: 10px 0 6px; font: 600 11px/1 var(--body, inherit); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.filter h2:first-child { margin-top: 0; }
+.filter div { display: flex; flex-wrap: wrap; gap: 6px; }
+.wahl { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid transparent; cursor: pointer;
+  background: rgba(150, 160, 255, 0.12); color: var(--text); font: 500 13px var(--body, inherit); white-space: nowrap; transition: background 0.12s; }
+.wahl:hover { background: rgba(150, 160, 255, 0.22); }
+.wahl small { color: var(--faint); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.wahl[aria-pressed="true"], .aktiv .wahl { background: var(--g-violet); color: #fff; }
+.wahl[aria-pressed="true"] small, .aktiv .wahl small { color: rgba(255, 255, 255, 0.8); }
+
+/* ---------- Stream ---------- */
+.meldung-gross { flex: 1; display: grid; place-items: center; margin: 0; padding: 30px; color: var(--muted); text-align: center; }
+.buehne { flex: 1; min-height: 0; display: flex; gap: 10px; padding: 0 10px 10px; position: relative; }
+.buehne[hidden], .wand[hidden], .meldung-gross[hidden], .aktiv[hidden], .filter[hidden] { display: none; }
+.lineal { flex: none; width: 74px; position: relative; border-radius: 14px; touch-action: none; cursor: pointer; user-select: none; -webkit-user-select: none; overflow: hidden; }
+.lineal i { position: absolute; right: 0; height: 1px; background: rgba(150, 160, 255, 0.35); width: 10px; }
+.lineal i.jahr { width: 100%; background: rgba(150, 160, 255, 0.28); }
+.lineal span { position: absolute; left: 8px; font-size: 10.5px; line-height: 1; color: var(--faint); transform: translateY(3px); white-space: nowrap; }
+.lineal span.jahr { font: 700 13px var(--display, inherit); color: var(--text); transform: translateY(5px); }
+.zeiger { position: absolute; top: 0; left: 4px; right: 4px; pointer-events: none; z-index: 2; text-align: center; padding: 6px 2px; border-radius: 9px;
+  background: var(--g-brand); color: #fff; font: 700 11.5px/1.15 var(--display, inherit); box-shadow: 0 10px 22px -8px rgba(192, 92, 255, 0.9);
+  will-change: transform; transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.zeiger small { display: block; font: 500 10px var(--body, inherit); opacity: 0.9; }
+.rolle { flex: 1; min-width: 0; overflow-y: auto; scroll-snap-type: y mandatory; overscroll-behavior: contain; border-radius: 14px; scrollbar-width: none; outline: none; }
+.rolle::-webkit-scrollbar { display: none; }
+.dok { height: 100%; scroll-snap-align: start; scroll-snap-stop: always; display: flex; flex-direction: column; padding: 10px; gap: 8px; position: relative; contain: layout paint style; }
+.blatt { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; position: relative; cursor: zoom-in; }
+.blatt img { max-width: 100%; max-height: 100%; border-radius: 8px; background: #fff; box-shadow: 0 24px 50px -24px rgba(0, 0, 0, 0.9);
+  opacity: 0; transform: scale(0.965); transition: opacity 0.28s ease, transform 0.42s cubic-bezier(0.2, 0.8, 0.2, 1); will-change: transform, opacity; }
+.blatt img.da { opacity: 0.55; }
+.dok.vorn .blatt img.da { opacity: 1; transform: none; }
+.blatt:hover img.da { transform: scale(1.012); }
+.blatt .leer { color: var(--faint); }
+.fuss { flex: none; display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap; padding: 10px 14px; border-radius: 14px;
+  opacity: 0.4; transform: translateY(6px); transition: opacity 0.25s ease, transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.dok.vorn .fuss { opacity: 1; transform: none; }
+.fuss > div:first-child { flex: 1 1 240px; min-width: 0; }
+.fuss b { display: block; font: 600 16px/1.25 var(--display, inherit); overflow-wrap: anywhere; }
+.fuss small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+.fuss .auszug { color: var(--text); opacity: 0.85; font-style: italic; }
+.fuss .tag { margin: 0 6px 0 0; cursor: pointer; }
+.fuss .tag.neu { background: rgba(61, 220, 151, 0.16); color: var(--good); cursor: default; }
+.fuss .tag.eingang { background: rgba(255, 196, 107, 0.16); color: var(--warn); }
+.fuss .knoepfe { flex: none; display: flex; gap: 8px; }
+mark { background: rgba(255, 196, 107, 0.3); color: inherit; border-radius: 3px; padding: 0 1px; }
+.pfeile { position: absolute; right: 26px; bottom: 104px; display: flex; flex-direction: column; gap: 8px; z-index: 3; }
+.pfeile button { width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--border-strong); color: #fff; font-size: 18px; cursor: pointer;
+  box-shadow: 0 14px 28px -14px rgba(0, 0, 0, 0.9); transition: transform 0.12s, opacity 0.15s; }
+.pfeile button:hover { transform: scale(1.08); }
+.pfeile button:disabled { opacity: 0.25; cursor: default; transform: none; }
+@media (hover: none) { .pfeile { display: none; } }
+
+/* ---------- Raster ---------- */
+.wand { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 12px 24px; display: grid; align-content: start;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 14px; scroll-behavior: smooth; }
+.wand h2 { grid-column: 1 / -1; margin: 12px 2px 0; font: 700 15px var(--display, inherit); color: var(--text); display: flex; align-items: baseline; gap: 10px; }
+.wand h2 small { color: var(--faint); font: 500 12px var(--body, inherit); }
+.kachel { display: flex; flex-direction: column; gap: 8px; padding: 8px 8px 10px; border-radius: 14px; border: 1px solid var(--glas-kante, var(--border)); cursor: pointer;
+  background: var(--glas, var(--surface-strong)); color: var(--text); text-align: left; font: inherit;
+  content-visibility: auto; contain-intrinsic-size: 168px 300px; transition: transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.16s; }
+.kachel:hover { transform: translateY(-3px); border-color: rgba(139, 124, 255, 0.7); }
+.kachel img { width: 100%; aspect-ratio: 1 / 1.35; object-fit: cover; object-position: top; border-radius: 8px; background: #fff; }
+.kachel b { font: 600 13.5px/1.3 var(--display, inherit); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.kachel small { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- Leser ---------- */
+dialog#leser { width: min(1100px, 96vw); height: 94dvh; max-width: none; max-height: none; padding: 0; border: 1px solid var(--glas-kante, var(--border-strong)); border-radius: 18px;
+  background: #171a34; color: var(--text); overflow: hidden; box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.9); }
+dialog#leser[open] { display: flex; flex-direction: column; animation: auf 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+dialog#leser::backdrop { background: rgba(8, 9, 24, 0.72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+@keyframes auf { from { opacity: 0; transform: translateY(14px) scale(0.985); } }
+.leserkopf { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 12px 10px 16px; border-bottom: 1px solid var(--border); }
+.leserkopf > div { flex: 1 1 220px; min-width: 0; }
+.leserkopf b { display: block; font: 600 15px/1.25 var(--display, inherit); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.leserkopf small { color: var(--muted); font-size: 12px; }
+#leserblatt { flex: 1; width: 100%; border: 0; background: #2a2d4a; }
+
+.hilfe { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 20; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; max-width: min(92vw, 760px);
+  padding: 12px 18px; border-radius: 16px; background: rgba(24, 27, 56, 0.94); border: 1px solid var(--border-strong); box-shadow: 0 24px 50px -20px rgba(0, 0, 0, 0.9); font-size: 13px; color: var(--muted); }
+.hilfe[hidden] { display: none; }
+.hilfe b { color: var(--text); }
+
+@media (max-width: 640px) {
+  .lineal { width: 50px; } .lineal span { left: 5px; font-size: 9.5px; } .lineal span.jahr { font-size: 11.5px; }
+  .buehne { padding: 0 6px 6px; gap: 6px; } .dok { padding: 4px; } .kopf { padding: 8px 10px; gap: 8px; }
+  .kopf .titel { flex-basis: 100%; } .suchfeld { flex-basis: 100%; max-width: none; order: 3; } .suchfeld kbd { display: none; }
+  .wand { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; padding: 4px 8px 20px; }
+  dialog#leser { width: 100vw; height: 100dvh; border-radius: 0; border: 0; }
+  .fuss .knoepfe { flex: 1 1 100%; } .fuss .knoepfe .knopf { flex: 1; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
