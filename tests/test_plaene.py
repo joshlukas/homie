@@ -15,7 +15,7 @@ from homie.server import app_bauen
 
 PW = secrets.token_urlsafe(18)
 GEHEIM = secrets.token_urlsafe(16)
-TOKEN_ID = "homie@pam!lesen"
+KENNUNG = "homie@pam!lesen"
 GIB = 1024 ** 3
 GESCHRIEBEN = []
 
@@ -49,7 +49,7 @@ async def _proxmox(request):
         return web.json_response({"data": None}, status=403)
     if request.path == "/":
         return web.Response(text="<title>knoten1 - Proxmox Virtual Environment</title>", content_type="text/html")
-    if request.headers.get("Authorization") != f"PVEAPIToken={TOKEN_ID}={GEHEIM}":
+    if request.headers.get("Authorization") != f"PVEAPIToken={KENNUNG}={GEHEIM}":
         return web.json_response({"data": None}, status=401)
     daten = _daten(request.path.removeprefix("/api2/json"))
     return web.json_response({"data": daten}, status=200 if daten is not None else 404)
@@ -72,7 +72,7 @@ class Plaene(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("Neue VM planen", text)        # ohne Proxmox kein Planformular
         r = await self.c.post("/dienst/neu", data={"csrf": self.csrf, "adresse": f"http://127.0.0.1:{self.rechner.port}"}, allow_redirects=False)
         self.assertEqual(r.status, 303)
-        r = await self.c.post("/dienst/1/verbinden", data={"csrf": self.csrf, "token-id": TOKEN_ID, "token": GEHEIM}, allow_redirects=False)
+        r = await self.c.post("/dienst/1/verbinden", data={"csrf": self.csrf, "token-id": KENNUNG, "token": GEHEIM}, allow_redirects=False)
         self.assertEqual(r.status, 303)
 
     async def asyncTearDown(self):
@@ -133,7 +133,7 @@ class Plaene(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(zustand.status, 200)
         self.assertIn("Proxmox VE", text)
         self.assertNotIn(GEHEIM, text)
-        self.assertNotIn(TOKEN_ID, text)
+        self.assertNotIn(KENNUNG, text)
         self.assertEqual((await (await self.c.get("/agent/rezepte", headers=kopf)).json())[0]["id"], "docker-vm")
         # vorschlagen: geht, landet als Entwurf mit Absender
         r = await self.c.post("/agent/plaene", headers=kopf, json={"rezept": "docker-vm", "parameter": {"name": "notizen", "ram_gb": 2}})
