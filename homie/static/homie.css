@@ -238,3 +238,39 @@ details.hand form button { margin-top: 16px; }
 .wochen .balken i { min-width: 0; }
 .wochen b { text-align: right; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
 .wochen .heute span { color: var(--text); font-weight: 600; }
+
+/* ---------- Etappe 2: Aufnahme und Finanzen ---------- */
+.rekorder { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px; }
+.rekorder p { margin: 0; }
+button.rund { min-height: 64px; padding: 0 30px; font-size: 16px; gap: 12px; background: var(--g-brand); }
+button.rund .punkt { width: 14px; height: 14px; border-radius: 50%; background: #fff; }
+button.rund[aria-pressed="true"] { background: linear-gradient(135deg, #ff5f7a, #ff8a6b); }
+button.rund[aria-pressed="true"] .punkt { border-radius: 3px; animation: puls 1.2s ease-in-out infinite; }
+@keyframes puls { 50% { opacity: 0.35; } }
+.notizen, .buchungen, .monate { list-style: none; margin: 8px 0 0; padding: 0; }
+.notizen li { padding: 11px 0; border-top: 1px solid rgba(150, 160, 255, 0.12); }
+.notizen .kopfzeile { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.notizen time { margin-left: auto; color: var(--faint); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.notizen p { overflow-wrap: anywhere; }
+.notizen .antwort { margin-top: 6px; padding: 8px 12px; border-left: 2px solid #c05cff; background: rgba(150, 160, 255, 0.06); border-radius: 0 8px 8px 0; color: var(--muted); font-size: 14px; }
+.buchungen li { display: flex; align-items: baseline; gap: 12px; padding: 9px 0; border-top: 1px solid rgba(150, 160, 255, 0.12); }
+.buchungen time { flex: none; width: 44px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.buchungen div { flex: 1; min-width: 0; }
+.buchungen b { display: block; font-weight: 600; overflow-wrap: anywhere; }
+.buchungen small { margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.buchungen span { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; }
+.minus { color: var(--bad); }
+.plus { color: var(--good); }
+.monate li { display: grid; grid-template-columns: 34px 1fr 84px; align-items: center; gap: 10px; padding: 7px 0; color: var(--muted); font-size: 13.5px; }
+.monate .balken { height: 7px; margin: 3px 0; }
+.monate .balken i { min-width: 0; }
+.balken.ein i, .legende i.ein { background: linear-gradient(90deg, #2fd4c4, #5b9dff); }
+.balken.aus i, .legende i.aus { background: linear-gradient(90deg, #ff5fa2, #ff8a6b); }
+.monate b { text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
+.monate b.minus { color: var(--bad); }
+.legende { margin-top: 8px; padding-bottom: 6px; }
+.legende i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin: 0 5px 0 0; }
+.legende i.aus { margin-left: 12px; }
+.kachel.ampel-gruen { border-color: rgba(61, 220, 151, 0.5); }
+.kachel.ampel-gelb { border-color: rgba(255, 196, 107, 0.6); }
+.kachel.ampel-rot { border-color: rgba(255, 107, 139, 0.6); }

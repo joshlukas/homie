@@ -126,6 +126,44 @@ PAPERLESS = {"/": _pl_start, "/api/documents/": _pl(_pl_dokumente), "/api/statis
              "/api/documents/{nr}/thumb/": _pl(_pl_bild)}
 
 
+ABGEGEBEN = []
+
+
+def _nd(antwort):
+    async def f(request):
+        if request.headers.get("Authorization") != f"Bearer {GUT}":
+            return web.json_response({"fehler": "nicht angemeldet"}, status=401)
+        return await antwort(request)
+    return f
+
+
+async def _nd_eintraege(request):
+    heute = dt.date.today().isoformat()
+    return web.json_response({"seit": heute, "kategorien": {"einkauf": "Einkäufe und Ausgaben", "notiz": "Notizen"}, "eintraege": [
+        {"id": 1, "zeit": heute + "T08:15:00+01:00", "tag": heute, "aufnahme": "a.m4a", "typ": "aufnahme", "text": "Rohtext der Aufnahme", "daten": {}},
+        {"id": 2, "zeit": heute + "T08:15:00+01:00", "tag": heute, "aufnahme": "a.m4a", "typ": "einkauf", "text": "Brot beim Bäcker", "daten": {"betrag_eur": 3.4}},
+        {"id": 3, "zeit": "2020-01-01T10:00:00+01:00", "tag": "2020-01-01", "aufnahme": "b.m4a", "typ": "fuer_claude", "text": "Frage an die KI", "daten": {"antwort": "Antwort der KI"}},
+    ]})
+
+
+async def _nd_finanzen(request):
+    return web.json_response({
+        "konten": [{"name": "Girokonto", "bank": "Testbank", "art": "giro", "saldo": 1234.5, "stand": "2026-03-04"}, {"name": "Karte", "bank": "Testbank", "art": "karte", "saldo": -87.1, "stand": "2026-03-03"}],
+        "budget": {"frei": 412.0, "je_tag": 31.7, "rest_tage": 13, "ausgegeben": 388.0, "spielraum": 800.0, "ampel": "gruen"},
+        "bilanz": {"2026-02": {"ein": 2500, "aus": -2100, "netto": 400}, "2026-03": {"ein": 2500, "aus": -2750.4, "netto": -250.4}},
+        "prognose": {"giro_ende": 950.0, "posten": [{"wer": "Miete", "betrag": -700, "gebucht": 0, "offen": -700, "tag": 3}, {"wer": "Strom", "betrag": -60, "gebucht": -60, "offen": 0, "tag": 15}]},
+        "abos": [{"wer": "Musikdienst", "je_monat": -10.99}],
+        "letzte": [{"tag": "2026-03-04", "wer": "Supermarkt", "zweck": "Kartenzahlung", "betrag": -23.45, "konto": "Girokonto"}], "hinweis": None})
+
+
+async def _nd_aufnahme(request):
+    ABGEGEBEN.append((request.headers.get("Content-Type"), len(await request.read())))
+    return web.json_response({"ok": True, "name": "Aufnahme_test.webm"})
+
+
+NOTIZDIENST = {"/api/eintraege": _nd(_nd_eintraege), "/api/finanzen": _nd(_nd_finanzen), "POST /api/aufnahme": _nd(_nd_aufnahme)}
+
+
 async def _ping(request):
     return web.Response(text="OK")
 
@@ -140,11 +178,11 @@ async def _container(request):
 class Erkunden(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.server = []
-        for antworten in (HA, {"/": _ollama}, {"/": _hinaus}, {"/_ping": _ping, "/containers/json": _container}, PAPERLESS):
+        for antworten in (HA, {"/": _ollama}, {"/": _hinaus}, {"/_ping": _ping, "/containers/json": _container}, PAPERLESS, NOTIZDIENST):
             s = TestServer(_dienst(antworten), host="127.0.0.1")
             await s.start_server()
             self.server.append(s)
-        ha, ollama, hinaus, docker, self.paperless = (s.port for s in self.server)
+        ha, ollama, hinaus, docker, self.paperless, self.notizdienst = (s.port for s in self.server)
         self.tmp = tempfile.TemporaryDirectory()
         einst = laden({"HOMIE_DATA": self.tmp.name, "HOMIE_DOCKER_URL": f"http://127.0.0.1:{docker}"})
         self.app = app_bauen(einst, erkundung_ziele=["127.0.0.1"], erkundung_ports=(ha, ollama, hinaus, 1))
@@ -211,7 +249,6 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         # Dienst ohne Schlüssel
         r = await self.c.post(f"/dienst/{ollama}/verbinden", data={"csrf": self.csrf}, allow_redirects=False)
         self.assertEqual(r.status, 303)
-        self.assertIn("aufnahme", self.aktiv())
         # erneute Erkundung behält den Zustand und legt nichts doppelt an
         await self.erkunden()
         dienste = await (await self.c.get("/api/dienste")).json()
@@ -221,7 +258,6 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.app[K_ABLAGE].namen(), [])
         self.assertNotIn("gesundheit", self.aktiv())
         await self.c.post(f"/dienst/{ollama}/ignorieren", data={"csrf": self.csrf}, allow_redirects=False)
-        self.assertNotIn("aufnahme", self.aktiv())
         self.assertIn("Ausgeblendet: 1", await (await self.c.get("/onboarding")).text())
 
     async def test_ohne_anmeldung_gesperrt(self):
@@ -262,6 +298,45 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         r = await self.c.get("/m/tag")
         self.assertEqual(r.status, 502)
         self.assertIn("lehnt den Schlüssel ab", await r.text())
+
+    async def test_notiz_assistent_aufnahme_und_finanzen(self):
+        r = await self.c.post("/dienst/neu", data={"csrf": self.csrf, "adresse": f"127.0.0.1:{self.notizdienst}"}, allow_redirects=False)
+        self.assertEqual(r.status, 303)
+        d = (await (await self.c.get("/api/dienste")).json())[0]
+        self.assertEqual((d["name"], d["art"]), ("Notiz-Assistent", "assistent"))
+        ton = b"\x1a\x45\xdf\xa3" + b"0" * 5000
+        kopf = {"Content-Type": "audio/webm;codecs=opus", "X-Homie-CSRF": self.csrf}
+        self.assertEqual((await self.c.post("/m/aufnahme/senden", data=ton, headers=kopf)).status, 404)   # noch nicht verbunden
+        self.assertEqual((await self.c.post(f"/dienst/{d['id']}/verbinden", data={"csrf": self.csrf, "token": "falsch"})).status, 400)
+        r = await self.c.post(f"/dienst/{d['id']}/verbinden", data={"csrf": self.csrf, "token": GUT}, allow_redirects=False)
+        self.assertEqual(r.status, 303)
+        self.assertTrue({"aufnahme", "finanzen"} <= self.aktiv())
+        # Aufnahme: eingeordnete Einträge, die rohe Aufnahme selbst wird nicht doppelt gezeigt
+        text = await (await self.c.get("/m/aufnahme")).text()
+        for erwartet in ("Heute", "Brot beim Bäcker", "Einkäufe und Ausgaben", "3,40 €", "Frage an die KI", "Antwort der KI", "Auftrag", "/static/aufnahme.js"):
+            self.assertIn(erwartet, text)
+        self.assertNotIn("Rohtext der Aufnahme", text)
+        self.assertNotIn(GUT, text)
+        # Aufnahme abgeben: nur mit Sicherheitsmarke, nur Ton, wird an den Assistenten durchgereicht
+        self.assertEqual((await self.c.post("/m/aufnahme/senden", data=ton, headers={"Content-Type": "audio/webm"})).status, 403)
+        self.assertEqual((await self.c.post("/m/aufnahme/senden", data=b"x" * 3000, headers={"Content-Type": "text/plain", "X-Homie-CSRF": self.csrf})).status, 415)
+        r = await self.c.post("/m/aufnahme/senden", data=ton, headers=kopf)
+        self.assertEqual((r.status, await r.json()), (200, {"ok": True, "name": "Aufnahme_test.webm"}))
+        self.assertEqual(ABGEGEBEN[-1], ("audio/webm;codecs=opus", len(ton)))
+        self.assertEqual((await self.c.get("/static/aufnahme.js")).status, 200)
+        # Finanzen
+        text = await (await self.c.get("/m/finanzen")).text()
+        for erwartet in ("412 €", "noch 13 Tage", "ausgegeben von 800 €", "950 €", "Girokonto", "1.234,50 €", "-87,10 €", "Stand 4.3.2026",
+                         "Miete", "meist um den 3.", "Musikdienst", "10,99 € / Monat", "Supermarkt", "-23,45 €", "Mär", "-250 €", "ampel-gruen"):
+            self.assertIn(erwartet, text)
+        self.assertNotIn("Strom", text)      # schon gebucht, also nicht mehr offen
+        self.assertNotIn(GUT, text)
+        self.c.session.cookie_jar.clear()
+        for pfad in ("/m/aufnahme", "/m/finanzen"):
+            self.assertEqual((await self.c.get(pfad, allow_redirects=False)).status, 303)
+        r = await self.c.post("/m/aufnahme/senden", data=ton, headers=kopf, allow_redirects=False)
+        self.assertEqual(r.status, 303)
+        self.assertEqual(len(ABGEGEBEN), 1)
 
     async def test_von_hand_hinzufuegen_und_dokumente_lesen(self):
         self.assertNotIn("Dokumente</a>", await (await self.c.get("/onboarding")).text())

@@ -2,13 +2,15 @@
 
 Ein Dashboard fürs Heimnetz, das sich selbst aufbaut: Homie erkundet dein Netz (nur lesend), zeigt gefundene Dienste als Karten, und sobald du einen Dienst verbindest, schaltet sich das passende Modul ein – Tagesüberblick, Aufnahme mit lokaler KI, Gesundheit, Finanzen, Dokumente, Netzplan.
 
-**Stand: Etappe 2.** Installation, Anmeldung, Erkundung des Heimnetzes, Verbinden mit geprüften Schlüsseln, Netzplan – und drei Module mit Inhalt:
+**Stand: Etappe 2.** Installation, Anmeldung, Erkundung des Heimnetzes, Verbinden mit geprüften Schlüsseln, Netzplan – und fünf Module mit Inhalt:
 
 - **Mein Tag** – Termine, Aufgaben und Wetter aus Home Assistant
 - **Gesundheit** – Schritte, Puls, Schlaf und mehr aus der Home-Assistant-App des Handys, mit Wochenverlauf
 - **Dokumente** – Paperless-ngx: Suche, neueste Dokumente, Vorschau
+- **Aufnahme** – Sprachnotiz aufnehmen und sehen, was der Notiz-Assistent daraus gemacht hat
+- **Finanzen** – Spielraum im Monat, Konten, Einnahmen und Ausgaben, kommende Posten
 
-*Aufnahme* und *Finanzen* folgen. Alle Module lesen nur und speichern keine Inhalte.
+*Aufnahme* und *Finanzen* setzen einen eigenen Dienst voraus (den „Notiz-Assistenten“, der Sprachnotizen mit lokaler KI verschriftlicht und Kontoumsätze auswertet); er gehört noch nicht zu Homie. Alle Module lesen nur und speichern keine Inhalte – einzige Ausnahme: eine neue Sprachaufnahme wird an den Notiz-Assistenten abgegeben. Der Aufnahmeknopf braucht eine https-Adresse, weil Browser das Mikrofon sonst nicht freigeben.
 
 Homie ist für das Heimnetz gedacht. Bitte nicht ins Internet freigeben.
 

@@ -1,0 +1,81 @@
+{% extends "basis.html" %}
+{% block titel %}Homie – Finanzen{% endblock %}
+{% block inhalt %}
+<section class="kopf">
+  <h1>Finanzen</h1>
+  <p class="leiser">Ausgewertet vom Notiz-Assistenten aus deinen Kontoumsätzen. Homie zeigt nur an und speichert nichts davon.</p>
+</section>
+{% if fehler %}
+<div class="glas leer"><h3>Gerade keine Zahlen</h3><p class="meldung" role="alert">{{ fehler }}</p></div>
+{% else %}
+{% if daten.hinweis %}<p class="glas hinweis">{{ daten.hinweis }}</p>{% endif %}
+{% if daten.budget %}
+<div class="kacheln">
+  <div class="glas kachel ampel-{{ daten.budget.ampel }}"><b{% if daten.budget.minus %} class="minus"{% endif %}>{{ daten.budget.frei }}</b><span>noch frei diesen Monat</span></div>
+  <div class="glas kachel"><b>{{ daten.budget.je_tag }}</b><span>je Tag{% if daten.budget.rest_tage is not none %} · noch {{ daten.budget.rest_tage }} Tage{% endif %}</span></div>
+  <div class="glas kachel"><b>{{ daten.budget.ausgegeben }}</b><span>ausgegeben von {{ daten.budget.spielraum }}</span></div>
+  {% if daten.giro_ende %}<div class="glas kachel"><b>{{ daten.giro_ende }}</b><span>Girokonto am Monatsende (geschätzt)</span></div>{% endif %}
+</div>
+{% endif %}
+
+<div class="spalten">
+  <section>
+    {% if daten.monate %}
+    <h2 class="gruppe"><span>Einnahmen und Ausgaben</span></h2>
+    <div class="glas tagkarte">
+      <ul class="monate">
+        {% for m in daten.monate %}
+        <li>
+          <span>{{ m.name }}</span>
+          <div><div class="balken ein"><i style="width: {{ m.anteil_ein }}%"></i></div><div class="balken aus"><i style="width: {{ m.anteil_aus }}%"></i></div></div>
+          <b{% if m.minus %} class="minus"{% endif %}>{{ m.netto }}</b>
+        </li>
+        {% endfor %}
+      </ul>
+      <p class="leiser klein legende"><i class="ein"></i>Einnahmen <i class="aus"></i>Ausgaben · rechts: was übrig blieb</p>
+    </div>
+    {% endif %}
+    {% if daten.letzte %}
+    <h2 class="gruppe"><span>Letzte Buchungen</span></h2>
+    <div class="glas tagkarte">
+      <ul class="buchungen">
+        {% for u in daten.letzte %}
+        <li><time>{{ u.tag }}</time><div><b>{{ u.wer or u.zweck }}</b>{% if u.wer and u.zweck %}<small>{{ u.zweck }}</small>{% endif %}</div><span class="{{ 'minus' if u.minus else 'plus' }}">{{ u.betrag }}</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </section>
+  <section>
+    {% if daten.konten %}
+    <h2 class="gruppe"><span>Konten</span></h2>
+    <div class="glas tagkarte">
+      <ul class="buchungen">
+        {% for k in daten.konten %}
+        <li><div><b>{{ k.name }}</b><small>{{ k.bank }}{% if k.stand %} · Stand {{ k.stand }}{% endif %}</small></div><span{% if k.minus %} class="minus"{% endif %}>{{ k.saldo }}</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    {% if daten.offen %}
+    <h2 class="gruppe"><span>Kommt diesen Monat noch</span></h2>
+    <div class="glas tagkarte">
+      <ul class="buchungen">
+        {% for p in daten.offen %}
+        <li><div><b>{{ p.wer }}</b>{% if p.tag %}<small>meist um den {{ p.tag }}.</small>{% endif %}</div><span>{{ p.betrag }}</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    {% if daten.abos %}
+    <h2 class="gruppe"><span>Abos</span></h2>
+    <div class="glas tagkarte">
+      <ul class="buchungen">
+        {% for a in daten.abos %}<li><div><b>{{ a.wer }}</b></div><span>{{ a.betrag }} / Monat</span></li>{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </section>
+</div>
+{% endif %}
+{% endblock %}

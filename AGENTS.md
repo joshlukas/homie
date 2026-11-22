@@ -32,6 +32,7 @@ Homie braucht keinen Agenten: Installation und Einrichtung laufen über die READ
 | `homie/erkundung.py` | Erkundung des Heimnetzes, nur lesend |
 | `homie/verbinden.py` | Schlüssel beim Dienst prüfen, bevor er abgelegt wird |
 | `homie/tag.py`, `homie/gesundheit.py` | Module Mein Tag und Gesundheit: lesen Home Assistant |
+| `homie/assistent.py` | Module Aufnahme und Finanzen: lesen den Notiz-Assistenten; gibt neue Aufnahmen an ihn ab |
 | `homie/dokumente.py` | Modul Dokumente: liest Paperless-ngx (nur lesend, nichts wird gespeichert) |
 | `homie/db.py`, `homie/config.py` | Datenbank im Datenordner, Einstellungen |
 | `tests/` | `python -m unittest discover -s tests -v` muss vor jeder Änderung und danach grün sein |

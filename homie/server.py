@@ -11,7 +11,7 @@ import aiohttp
 import jinja2
 from aiohttp import web
 
-from . import dokumente, gesundheit, katalog, module, tag, verbinden
+from . import assistent, dokumente, gesundheit, katalog, module, tag, verbinden
 from .ablage import Ablage
 from .anmeldung import COOKIE, MIN_LAENGE, Anmeldung, passwort_maengel
 from .config import PAKET, VERSION, Einstellungen
@@ -309,6 +309,48 @@ async def _seite_gesundheit(request: web.Request, modul: module.Modul) -> web.Re
     return _seite(request, "gesundheit.html", status=200 if daten else 502, modul=modul, daten=daten, fehler=fehler)
 
 
+async def _seite_aufnahme(request: web.Request, modul: module.Modul) -> web.Response:
+    zugang = _zugang(request.app, "assistent", ("token",))
+    daten, fehler = None, ""
+    try:
+        daten = await assistent.eintraege(zugang[0], zugang[1]["token"])
+    except assistent.AssistentFehler as e:
+        fehler = str(e)
+    return _seite(request, "aufnahme.html", status=200 if daten else 502, modul=modul, daten=daten, fehler=fehler)
+
+
+async def _seite_finanzen(request: web.Request, modul: module.Modul) -> web.Response:
+    zugang = _zugang(request.app, "assistent", ("token",))
+    daten, fehler = None, ""
+    try:
+        daten = await assistent.finanzen(zugang[0], zugang[1]["token"])
+    except assistent.AssistentFehler as e:
+        fehler = str(e)
+    return _seite(request, "finanzen.html", status=200 if daten else 502, modul=modul, daten=daten, fehler=fehler)
+
+
+async def aufnahme_senden(request: web.Request) -> web.Response:
+    """Nimmt eine Sprachaufnahme aus dem Browser an und gibt sie an den Notiz-Assistenten weiter. Homie behält nichts."""
+    aktiv = any(s.aktiv and s.modul.id == "aufnahme" for s in module.stand(request.app[K_DB], request.app[K_ABLAGE]))
+    zugang = _zugang(request.app, "assistent", ("token",)) if aktiv else None
+    if zugang is None:
+        return web.json_response({"fehler": "Das Modul Aufnahme ist nicht aktiv."}, status=404)
+    art = request.content_type
+    if not art.startswith("audio/") and not art.startswith("video/"):
+        return web.json_response({"fehler": "Das ist keine Tonaufnahme."}, status=415)
+    ton = bytearray()
+    async for stueck in request.content.iter_chunked(65536):
+        ton.extend(stueck)
+        if len(ton) > assistent.MAX_AUFNAHME:
+            return web.json_response({"fehler": "Die Aufnahme ist zu lang."}, status=413)
+    try:
+        name = await assistent.aufnahme_senden(zugang[0], zugang[1]["token"], bytes(ton), request.headers.get("Content-Type", art),
+                                               request.headers.get("X-Aufnahme-Zeit", ""))
+    except assistent.AssistentFehler as e:
+        return web.json_response({"fehler": str(e)}, status=502)
+    return web.json_response({"ok": True, "name": name})
+
+
 async def dokument_vorschau(request: web.Request) -> web.Response:
     aktiv = any(s.aktiv and s.modul.id == "dokumente" for s in module.stand(request.app[K_DB], request.app[K_ABLAGE]))
     zugang = _zugang(request.app, "dokumente", ("token",)) if aktiv else None
@@ -398,6 +440,10 @@ async def modulseite(request: web.Request) -> web.Response:
                 return await _seite_tag(request, s.modul)
             if kennung == "gesundheit":
                 return await _seite_gesundheit(request, s.modul)
+            if kennung == "aufnahme":
+                return await _seite_aufnahme(request, s.modul)
+            if kennung == "finanzen":
+                return await _seite_finanzen(request, s.modul)
             return _seite(request, "modul.html", modul=s.modul)
     raise web.HTTPNotFound(text="Dieses Modul ist nicht aktiv.")
 
@@ -457,6 +503,7 @@ def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, er
         web.get("/api/netzplan", api_netzplan),
         web.post("/erkundung/start", erkundung_start),
         web.post("/dienst/neu", dienst_neu),
+        web.post("/m/aufnahme/senden", aufnahme_senden),
         web.get("/m/dokumente/vorschau/{nr:\\d+}", dokument_vorschau),
         web.post("/dienst/{id}/verbinden", dienst_verbinden),
         web.post("/dienst/{id}/{was:trennen|ignorieren|zeigen}", dienst_zustand),

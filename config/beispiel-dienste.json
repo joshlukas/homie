@@ -11,7 +11,7 @@
     },
     {
       "art": "ki-lokal", "name": "Ollama", "adresse": "http://192.0.2.40:11434", "zustand": "gefunden", "farbe": "#2fd4c4",
-      "details": {"beschreibung": "Lokale KI für Text und Sprache", "braucht": "keinen Schlüssel", "schaltet_frei": "Aufnahme"}
+      "details": {"beschreibung": "Lokale KI für Text und Sprache", "braucht": "keinen Schlüssel", "schaltet_frei": "später: KI-Funktionen in Homie"}
     },
     {
       "art": "virtualisierung", "name": "Proxmox VE", "adresse": "https://192.0.2.10:8006", "zustand": "gefunden", "farbe": "#c77dff",

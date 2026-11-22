@@ -53,7 +53,7 @@ MODULE: tuple[Modul, ...] = (
     ),
     Modul(
         "aufnahme", "Aufnahme", "Sprachnotizen aufnehmen; eine lokale KI schreibt mit und ordnet ein.",
-        (Bedarf("ki-lokal", "eine lokale KI (z. B. Ollama mit Sprach- und Textmodell)"),), farbe="#2fd4c4",
+        (Bedarf("assistent", "ein Notiz-Assistent (eigener Dienst, der Sprachnotizen verschriftlicht)", ("token",)),), farbe="#2fd4c4",
     ),
     Modul(
         "gesundheit", "Gesundheit", "Schlaf, Bewegung und Messwerte im Verlauf.",
@@ -61,7 +61,7 @@ MODULE: tuple[Modul, ...] = (
     ),
     Modul(
         "finanzen", "Finanzen", "Kontostand, Ausgaben und Ausblick auf den Monat.",
-        (Bedarf("finanzen", "eine Finanzquelle (z. B. Firefly III oder Actual Budget)", ("token",)),), farbe="#ffc46b",
+        (Bedarf("assistent", "ein Notiz-Assistent (eigener Dienst, der Kontoumsätze auswertet)", ("token",)),), farbe="#ffc46b",
     ),
     Modul(
         "dokumente", "Dokumente", "Post und Unterlagen durchsuchen, Fristen im Blick.",

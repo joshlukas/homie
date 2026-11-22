@@ -26,6 +26,8 @@ def _anfrage(kennung: str, w: dict[str, str]) -> tuple[str, dict[str, str], aioh
         return "/api/users/me", {"x-api-key": w["token"]}, None
     if kennung == "firefly":
         return "/api/v1/about", {"Authorization": f"Bearer {w['token']}", "Accept": "application/json"}, None
+    if kennung == "notizdienst":
+        return "/api/eintraege?tage=1", {"Authorization": f"Bearer {w['token']}"}, None
     if kennung == "nextcloud":
         return "/ocs/v2.php/cloud/user?format=json", {"OCS-APIRequest": "true"}, aiohttp.BasicAuth(w["benutzer"], w["app-passwort"])
     return None
