@@ -1,0 +1,50 @@
+{% extends "basis.html" %}
+{% block titel %}Homie – Dokumente{% endblock %}
+{% block inhalt %}
+<section class="kopf">
+  <h1>Dokumente</h1>
+  <p class="leiser">Dein Archiv, direkt durchsuchbar. Homie liest nur – geändert wird im Archiv selbst.</p>
+</section>
+
+<form method="get" action="/m/dokumente" class="suche" role="search">
+  <label for="q" class="unsichtbar">Suche</label>
+  <input id="q" name="q" type="text" value="{{ suche }}" placeholder="Wonach suchst du? Zum Beispiel: Rechnung Versicherung 2025" autocomplete="off">
+  <button type="submit">Suchen</button>
+  {% if suche %}<a class="knopf leise" href="/m/dokumente">Zurücksetzen</a>{% endif %}
+</form>
+
+{% if fehler %}
+<div class="glas leer"><h3>Gerade keine Dokumente</h3><p class="meldung" role="alert">{{ fehler }}</p></div>
+{% else %}
+<div class="kacheln">
+  <div class="glas kachel"><b>{{ daten.gesamt }}</b><span>Dokumente im Archiv</span></div>
+  <div class="glas kachel"><b>{{ daten.posteingang }}</b><span>im Posteingang</span></div>
+  {% if suche %}<div class="glas kachel"><b>{{ daten.treffer }}</b><span>Treffer für „{{ suche }}“</span></div>{% endif %}
+</div>
+
+<h2 class="gruppe"><span>{{ 'Treffer' if suche else 'Neueste Dokumente' }}</span></h2>
+{% if daten.dokumente %}
+<div class="raster belege">
+  {% for d in daten.dokumente %}
+  <a class="glas beleg" href="{{ d.link }}" target="_blank" rel="noopener noreferrer">
+    <img src="/m/dokumente/vorschau/{{ d.id }}" alt="" loading="lazy" width="96" height="136">
+    <div>
+      <h3>{{ d.titel }}</h3>
+      <p class="leiser">{{ [d.korrespondent, d.art, d.datum] | select | join(' · ') }}</p>
+      {% if d.schlagwoerter %}<p class="marken">{% for s in d.schlagwoerter %}<span class="chip">{{ s }}</span>{% endfor %}</p>{% endif %}
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% if daten.seiten > 1 %}
+<nav class="blaettern" aria-label="Seiten">
+  {% if daten.seite > 1 %}<a class="knopf leise" href="/m/dokumente?{{ {'q': suche, 'seite': daten.seite - 1} | urlencode }}">Zurück</a>{% endif %}
+  <span class="leiser">Seite {{ daten.seite }} von {{ daten.seiten }}</span>
+  {% if daten.seite < daten.seiten %}<a class="knopf leise" href="/m/dokumente?{{ {'q': suche, 'seite': daten.seite + 1} | urlencode }}">Weiter</a>{% endif %}
+</nav>
+{% endif %}
+{% else %}
+<div class="glas leer"><h3>Nichts gefunden</h3><p class="leiser">{{ 'Zu dieser Suche gibt es keine Dokumente.' if suche else 'Das Archiv ist noch leer.' }}</p></div>
+{% endif %}
+{% endif %}
+{% endblock %}

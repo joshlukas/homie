@@ -11,12 +11,12 @@ import aiohttp
 import jinja2
 from aiohttp import web
 
-from . import katalog, module, verbinden
+from . import dokumente, katalog, module, verbinden
 from .ablage import Ablage
 from .anmeldung import COOKIE, MIN_LAENGE, Anmeldung, passwort_maengel
 from .config import PAKET, VERSION, Einstellungen
 from .db import Datenbank
-from .erkundung import Erkundung, letzte
+from .erkundung import Erkundung, letzte, von_hand
 
 OEFFENTLICH = ("/login", "/einrichten")
 KOPFZEILEN = {
@@ -55,7 +55,7 @@ async def kopfzeilen(request: web.Request, handler):
         antwort = e
     for k, v in KOPFZEILEN.items():
         antwort.headers.setdefault(k, v)
-    if not request.path.startswith("/static/"):
+    if not request.path.startswith("/static/") and "Cache-Control" not in antwort.headers:
         antwort.headers["Cache-Control"] = "no-store"
     if isinstance(antwort, web.HTTPException):
         raise antwort
@@ -216,7 +216,8 @@ def _karten(app: web.Application) -> list[dict]:
             "geraet": d["details"].get("geraet", ""),
             "beschreibung": e.beschreibung if e else d["art"], "farbe": e.farbe if e else "#8b7cff",
             "felder": e.felder if e else (), "schaltet_frei": e.schaltet_frei if e else "",
-            "vermisst": bool(stand) and d["details"].get("gesehen", 0) < stand.get("zeit", 0),
+            "von_hand": d["details"].get("quelle") == "hand",
+            "vermisst": bool(stand) and d["details"].get("quelle") != "hand" and d["details"].get("gesehen", 0) < stand.get("zeit", 0),
         })
     return karten
 
@@ -229,11 +230,11 @@ def _beispiele(app: web.Application) -> list[dict]:
     return [{
         "id": 0, "name": d["name"], "zustand": d["zustand"], "adresse": d["adresse"], "geraet": "", "farbe": d.get("farbe", "#8b7cff"),
         "beschreibung": d["details"].get("beschreibung", ""), "felder": (), "braucht": d["details"].get("braucht", ""),
-        "schaltet_frei": d["details"].get("schaltet_frei", ""), "vermisst": False,
+        "schaltet_frei": d["details"].get("schaltet_frei", ""), "vermisst": False, "von_hand": False,
     } for d in roh]
 
 
-async def onboarding(request: web.Request, status: int = 200, kartenfehler: dict | None = None) -> web.Response:
+async def onboarding(request: web.Request, status: int = 200, kartenfehler: dict | None = None, hand: str = "") -> web.Response:
     app = request.app
     beispiel = request.query.get("beispiel") == "1"
     erk = app[K_ERK]
@@ -243,7 +244,7 @@ async def onboarding(request: web.Request, status: int = 200, kartenfehler: dict
         beispiel=beispiel,
         dienste=[k for k in karten if k["zustand"] != "ignoriert"],
         ignoriert=[k for k in karten if k["zustand"] == "ignoriert"],
-        kartenfehler=kartenfehler or {}, ok=request.query.get("ok", ""),
+        kartenfehler=kartenfehler or {}, ok=request.query.get("ok", ""), hand=hand,
         module=[s for s in module.stand(app[K_DB], app[K_ABLAGE]) if not s.modul.kern],
         docker=await _docker_stand(app),
         erkundung={"laeuft": erk.laeuft, "text": erk.text, "prozent": int(erk.anteil * 100), "fehler": erk.fehler},
@@ -254,6 +255,50 @@ async def onboarding(request: web.Request, status: int = 200, kartenfehler: dict
 async def erkundung_start(request: web.Request) -> web.Response:
     request.app[K_ERK].starten()
     raise web.HTTPSeeOther("/onboarding")
+
+
+async def dienst_neu(request: web.Request) -> web.Response:
+    in_ordnung, meldung = await von_hand(request.app[K_DB], str((await request.post()).get("adresse", "")))
+    if not in_ordnung:
+        return await onboarding(request, 400, hand=meldung)
+    raise web.HTTPSeeOther("/onboarding#dienste")
+
+
+def _zugang(app: web.Application, art: str, felder: tuple[str, ...]) -> tuple[str, dict[str, str]] | None:
+    """Adresse und Schlüssel des ersten verbundenen Dienstes dieser Art – nur für Aufrufe beim Dienst selbst."""
+    for d in _dienste(app):
+        if d["art"] == art and d["zustand"] == "verbunden":
+            werte = {f: app[K_ABLAGE].lesen(module.schluesselname(d["id"], f)) for f in felder}
+            if all(werte.values()):
+                return d["adresse"], werte
+    return None
+
+
+async def _seite_dokumente(request: web.Request, modul: module.Modul) -> web.Response:
+    zugang = _zugang(request.app, "dokumente", ("token",))
+    suche = request.query.get("q", "").strip()[:200]
+    try:
+        seite = max(1, int(request.query.get("seite", "1")))
+    except ValueError:
+        seite = 1
+    daten, fehler = None, ""
+    try:
+        daten = await dokumente.uebersicht(zugang[0], zugang[1]["token"], suche, seite)
+    except dokumente.DokumenteFehler as e:
+        fehler = str(e)
+    return _seite(request, "dokumente.html", status=200 if daten else 502, modul=modul, suche=suche, daten=daten, fehler=fehler)
+
+
+async def dokument_vorschau(request: web.Request) -> web.Response:
+    aktiv = any(s.aktiv and s.modul.id == "dokumente" for s in module.stand(request.app[K_DB], request.app[K_ABLAGE]))
+    zugang = _zugang(request.app, "dokumente", ("token",)) if aktiv else None
+    if zugang is None:
+        raise web.HTTPNotFound()
+    try:
+        bild, art = await dokumente.vorschau(zugang[0], zugang[1]["token"], int(request.match_info["nr"]))
+    except dokumente.DokumenteFehler:
+        raise web.HTTPNotFound()
+    return web.Response(body=bild, content_type=art, headers={"Cache-Control": "private, max-age=3600"})
 
 
 def _dienst(request: web.Request) -> dict:
@@ -327,6 +372,8 @@ async def modulseite(request: web.Request) -> web.Response:
         if s.modul.id == kennung and s.aktiv and not s.modul.kern:
             if kennung == "netzplan":
                 return _seite(request, "netzplan.html", modul=s.modul, **_netzplan(request.app))
+            if kennung == "dokumente":
+                return await _seite_dokumente(request, s.modul)
             return _seite(request, "modul.html", modul=s.modul)
     raise web.HTTPNotFound(text="Dieses Modul ist nicht aktiv.")
 
@@ -385,6 +432,8 @@ def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, er
         web.get("/api/erkundung", api_erkundung),
         web.get("/api/netzplan", api_netzplan),
         web.post("/erkundung/start", erkundung_start),
+        web.post("/dienst/neu", dienst_neu),
+        web.get("/m/dokumente/vorschau/{nr:\\d+}", dokument_vorschau),
         web.post("/dienst/{id}/verbinden", dienst_verbinden),
         web.post("/dienst/{id}/{was:trennen|ignorieren|zeigen}", dienst_zustand),
         web.static("/static", PAKET / "static"),

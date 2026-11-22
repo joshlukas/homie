@@ -147,8 +147,9 @@ async def _lesen(sitzung: aiohttp.ClientSession, url: str) -> tuple[int, str] | 
     return None
 
 
-async def _erkennen(sitzung: aiohttp.ClientSession, ip: str, port: int) -> Fund | None:
-    if port in NUR_PORT:
+async def _erkennen(sitzung: aiohttp.ClientSession, ip: str, port: int, frei: bool = False) -> Fund | None:
+    """frei=True: Port stammt aus Docker oder von Hand – dann zählt auch eine unbekannte Seite mit Titel."""
+    if port in NUR_PORT and not frei:
         art, name = NUR_PORT[port]
         return Fund(ip, port, art, name)
     schemata = ("https", "http") if port in TLS_ZUERST else ("http", "https")
@@ -164,7 +165,7 @@ async def _erkennen(sitzung: aiohttp.ClientSession, ip: str, port: int) -> Fund 
     treffer: Eintrag | None = next((e for e in KATALOG if e.pfad == "/" and any(m in text for m in e.muster)), None)
     if treffer is None:
         for e in KATALOG:
-            if e.pfad != "/" and port in e.ports:
+            if e.pfad != "/" and (frei or port in e.ports):
                 antwort = await _lesen(sitzung, basis + e.pfad)
                 if antwort and any(m in antwort[1].lower() for m in e.muster):
                     treffer = e
@@ -173,7 +174,7 @@ async def _erkennen(sitzung: aiohttp.ClientSession, ip: str, port: int) -> Fund 
     titel = re.sub(r"\s+", " ", m.group(1)).strip()[:80] if m else ""
     if treffer:
         return Fund(ip, port, treffer.art, treffer.name, basis, treffer.id, titel)
-    if port in WEB_PORTS and titel:
+    if (frei or port in WEB_PORTS) and titel:
         return Fund(ip, port, "web", titel, basis, "", titel)
     return None
 
@@ -209,21 +210,25 @@ async def docker_lesen(docker_url: str) -> tuple[str, list[dict]]:
 
 
 async def erkunden(adressen: list[str], ports: tuple[int, ...], docker_url: str, melden=lambda text, anteil: None,
-                   warten: float = 0.7) -> Ergebnis:
+                   warten: float = 0.7, eigene: tuple[str, ...] = ()) -> Ergebnis:
     erg = Ergebnis()
     melden("Docker wird gelesen …", 0.02)
     erg.docker, erg.container = await docker_lesen(docker_url)
+    # Ports, die Docker auf diesem Rechner veröffentlicht, werden hier zusätzlich angesehen –
+    # so tauchen auch Dienste auf ungewöhnlichen Ports auf.
+    docker_ports = {p for c in erg.container if c["zustand"] == "running" for p in c["ports"]} - set(ports)
 
     grenze = asyncio.Semaphore(200)
     fertig = 0
 
     async def pruefen(ip: str) -> tuple[str, list[int]]:
         nonlocal fertig
-        offen = await asyncio.gather(*(_offen(ip, p, grenze, warten) for p in ports))
+        hier = ports + tuple(sorted(docker_ports)) if ip in eigene else ports
+        offen = await asyncio.gather(*(_offen(ip, p, grenze, warten) for p in hier))
         fertig += 1
         if fertig % 8 == 0 or fertig == len(adressen):
             melden(f"Adressen werden geprüft … {fertig} von {len(adressen)}", 0.05 + 0.6 * fertig / max(1, len(adressen)))
-        return ip, [p for p, o in zip(ports, offen) if o]
+        return ip, [p for p, o in zip(hier, offen) if o]
 
     offene = [(ip, ps) for ip, ps in await asyncio.gather(*(pruefen(ip) for ip in adressen)) if ps]
 
@@ -231,7 +236,7 @@ async def erkunden(adressen: list[str], ports: tuple[int, ...], docker_url: str,
     verbinder = aiohttp.TCPConnector(ssl=False, limit=40)
     async with aiohttp.ClientSession(connector=verbinder, timeout=aiohttp.ClientTimeout(total=4),
                                      headers={"User-Agent": "Homie-Erkundung"}) as sitzung:
-        funde = await asyncio.gather(*(_erkennen(sitzung, ip, p) for ip, ps in offene for p in ps))
+        funde = await asyncio.gather(*(_erkennen(sitzung, ip, p, frei=p in docker_ports) for ip, ps in offene for p in ps))
     melden("Namen werden nachgeschlagen …", 0.92)
     namen = await asyncio.gather(*(_name(ip) for ip, _ in offene))
     macs = _mac_tabelle()
@@ -291,13 +296,55 @@ def speichern(db: Datenbank, erg: Ergebnis) -> dict:
     # Was nie verbunden wurde und jetzt nicht mehr antwortet, verschwindet wieder.
     # Verbundene und ausgeblendete Dienste bleiben und werden als „nicht mehr erreichbar“ markiert.
     for z in db.alle("SELECT id, details FROM dienst WHERE zustand='gefunden'"):
-        if json.loads(z["details"]).get("gesehen", 0) < jetzt:
+        d = json.loads(z["details"])
+        if d.get("gesehen", 0) < jetzt and d.get("quelle") != "hand":
             db.ausfuehren("DELETE FROM dienst WHERE id=?", (z["id"],))
     bilanz = {"zeit": jetzt, "geraete": len(erg.geraete), "dienste": sum(1 for f in erg.funde if _als_karte(f)), "neu": neu,
               "container": len(erg.container), "docker": erg.docker, "router": erg.router, "eigene": erg.eigene}
     db.ausfuehren("INSERT INTO merk (name, wert) VALUES ('erkundung', ?) ON CONFLICT(name) DO UPDATE SET wert=excluded.wert",
                   (json.dumps(bilanz),))
     return bilanz
+
+
+async def von_hand(db: Datenbank, eingabe: str) -> tuple[bool, str]:
+    """Einen Dienst über seine Adresse hinzufügen – für alles, was die Erkundung nicht findet,
+    etwa Dienste, die nur über einen Namen hinter einem Proxy erreichbar sind."""
+    eingabe = eingabe.strip().rstrip("/")
+    if "://" not in eingabe:
+        eingabe = "http://" + eingabe
+    teile = urlsplit(eingabe)
+    if teile.scheme not in ("http", "https") or not teile.hostname:
+        return False, "Das ist keine gültige Adresse. Beispiel: https://cloud.beispiel.de"
+    try:
+        port = teile.port or (443 if teile.scheme == "https" else 80)
+    except ValueError:
+        return False, "Der Port in der Adresse ist ungültig."
+    basis = f"{teile.scheme}://{teile.hostname}" + (f":{teile.port}" if teile.port else "")
+    verbinder = aiohttp.TCPConnector(ssl=False)
+    async with aiohttp.ClientSession(connector=verbinder, timeout=aiohttp.ClientTimeout(total=6),
+                                     headers={"User-Agent": "Homie-Erkundung"}) as sitzung:
+        start = await _lesen(sitzung, basis + "/")
+        if start is None:
+            return False, "Unter dieser Adresse antwortet nichts."
+        text, treffer = start[1].lower(), None
+        treffer = next((e for e in KATALOG if e.karte and e.pfad == "/" and any(m in text for m in e.muster)), None)
+        if treffer is None:
+            for e in KATALOG:
+                if e.karte and e.pfad != "/":
+                    antwort = await _lesen(sitzung, basis + e.pfad)
+                    if antwort and any(m in antwort[1].lower() for m in e.muster):
+                        treffer = e
+                        break
+    if treffer is None:
+        return False, "Dort läuft kein Dienst, den Homie kennt."
+    for z in db.alle("SELECT adresse FROM dienst WHERE art=?", (treffer.art,)):
+        if z["adresse"] == basis:
+            return False, f"{treffer.name} unter dieser Adresse ist schon eingetragen."
+    details = json.dumps({"ip": teile.hostname, "port": port, "kennung": treffer.id, "geraet": teile.hostname,
+                          "gesehen": int(time.time()), "quelle": "hand"})
+    db.ausfuehren("INSERT INTO dienst (art, name, adresse, zustand, gefunden, details) VALUES (?,?,?,'gefunden',?,?)",
+                  (treffer.art, treffer.name, basis, int(time.time()), details))
+    return True, f"{treffer.name} hinzugefügt."
 
 
 def letzte(db: Datenbank) -> dict | None:
@@ -337,7 +384,7 @@ class Erkundung:
         try:
             netze = eigene_netze() if self._adressen is None else []
             adressen = ziele(netze) if self._adressen is None else self._adressen
-            erg = await erkunden(adressen, self._ports, self._docker_url, self._melden)
+            erg = await erkunden(adressen, self._ports, self._docker_url, self._melden, eigene=tuple(str(n.ip) for n in netze))
             erg.router, erg.eigene = standard_router(), [str(n.ip) for n in netze]
             speichern(self._db, erg)
             self._melden("Fertig.", 1.0)

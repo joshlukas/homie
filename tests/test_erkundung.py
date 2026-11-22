@@ -42,6 +42,45 @@ async def _hinaus(request):
     raise web.HTTPFound("http://nach-draussen.invalid/")
 
 
+DOKUMENTE = [{"id": n, "title": f"Beleg {n}", "correspondent": 1, "document_type": 2, "tags": [3], "created": "2026-03-0%d" % n, "page_count": 2}
+             for n in range(1, 4)]
+
+
+async def _pl_start(request):
+    return web.Response(text="<title>Paperless-ngx sign in</title>", content_type="text/html")
+
+
+def _pl(antwort):
+    async def f(request):
+        if request.headers.get("Authorization") != f"Token {GUT}":
+            return web.json_response({"detail": "nein"}, status=401)
+        return await antwort(request)
+    return f
+
+
+async def _pl_dokumente(request):
+    q = request.query.get("query", "")
+    treffer = [d for d in DOKUMENTE if q.lower() in d["title"].lower()]
+    return web.json_response({"count": len(treffer), "results": treffer})
+
+
+async def _pl_namen(request):
+    return web.json_response({"results": [{"id": 1, "name": "Stadtwerke"}, {"id": 2, "name": "Rechnung"}, {"id": 3, "name": "Wohnung"}]})
+
+
+async def _pl_zahlen(request):
+    return web.json_response({"documents_total": 3, "documents_inbox": 1})
+
+
+async def _pl_bild(request):
+    return web.Response(body=b"RIFF....WEBP", content_type="image/webp")
+
+
+PAPERLESS = {"/": _pl_start, "/api/documents/": _pl(_pl_dokumente), "/api/statistics/": _pl(_pl_zahlen),
+             "/api/correspondents/": _pl(_pl_namen), "/api/document_types/": _pl(_pl_namen), "/api/tags/": _pl(_pl_namen),
+             "/api/documents/{nr}/thumb/": _pl(_pl_bild)}
+
+
 async def _ping(request):
     return web.Response(text="OK")
 
@@ -56,11 +95,11 @@ async def _container(request):
 class Erkunden(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.server = []
-        for antworten in ({"/": _ha_start, "/api/": _ha_api}, {"/": _ollama}, {"/": _hinaus}, {"/_ping": _ping, "/containers/json": _container}):
+        for antworten in ({"/": _ha_start, "/api/": _ha_api}, {"/": _ollama}, {"/": _hinaus}, {"/_ping": _ping, "/containers/json": _container}, PAPERLESS):
             s = TestServer(_dienst(antworten), host="127.0.0.1")
             await s.start_server()
             self.server.append(s)
-        ha, ollama, hinaus, docker = (s.port for s in self.server)
+        ha, ollama, hinaus, docker, self.paperless = (s.port for s in self.server)
         self.tmp = tempfile.TemporaryDirectory()
         einst = laden({"HOMIE_DATA": self.tmp.name, "HOMIE_DOCKER_URL": f"http://127.0.0.1:{docker}"})
         self.app = app_bauen(einst, erkundung_ziele=["127.0.0.1"], erkundung_ports=(ha, ollama, hinaus, 1))
@@ -149,6 +188,46 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
             r = await self.c.post(pfad, data={"csrf": self.csrf}, allow_redirects=False)
             self.assertEqual((r.status, r.headers["Location"]), (303, "/login"), pfad)
         self.assertEqual((await self.c.get("/m/netzplan", allow_redirects=False)).status, 303)
+
+
+    async def test_von_hand_hinzufuegen_und_dokumente_lesen(self):
+        self.assertNotIn("Dokumente</a>", await (await self.c.get("/onboarding")).text())
+        # Unsinn und Unbekanntes werden abgelehnt
+        for adresse, meldung in (("ftp://x", "keine gültige Adresse"), (f"127.0.0.1:{self.server[2].port}", "kein Dienst, den Homie kennt"), ("127.0.0.1:1", "antwortet nichts")):
+            r = await self.c.post("/dienst/neu", data={"csrf": self.csrf, "adresse": adresse})
+            self.assertEqual(r.status, 400, adresse)
+            self.assertIn(meldung, await r.text())
+        r = await self.c.post("/dienst/neu", data={"csrf": self.csrf, "adresse": f"127.0.0.1:{self.paperless}/"}, allow_redirects=False)
+        self.assertEqual(r.status, 303)
+        r = await self.c.post("/dienst/neu", data={"csrf": self.csrf, "adresse": f"http://127.0.0.1:{self.paperless}"})
+        self.assertIn("schon eingetragen", await r.text())
+        d = (await (await self.c.get("/api/dienste")).json())[0]
+        self.assertEqual((d["name"], d["art"], d["zustand"]), ("Paperless-ngx", "dokumente", "gefunden"))
+        # Von Hand Hinzugefügtes übersteht eine Erkundung
+        await self.erkunden()
+        self.assertIn("Paperless-ngx", [x["name"] for x in await (await self.c.get("/api/dienste")).json()])
+        # vor dem Verbinden: Modul und Vorschau gesperrt
+        self.assertEqual((await self.c.get("/m/dokumente")).status, 404)
+        self.assertEqual((await self.c.get("/m/dokumente/vorschau/1")).status, 404)
+        r = await self.c.post(f"/dienst/{d['id']}/verbinden", data={"csrf": self.csrf, "token": GUT}, allow_redirects=False)
+        self.assertEqual(r.status, 303)
+        r = await self.c.get("/m/dokumente")
+        text = await r.text()
+        self.assertEqual(r.status, 200)
+        for erwartet in ("Beleg 1", "Beleg 3", "Stadtwerke · Rechnung · 03.03.2026", "Wohnung", "Neueste Dokumente", "/m/dokumente/vorschau/2",
+                         f"http://127.0.0.1:{self.paperless}/documents/1/details"):
+            self.assertIn(erwartet, text)
+        self.assertNotIn(GUT, text)
+        text = await (await self.c.get("/m/dokumente?q=beleg+2")).text()
+        self.assertIn("Beleg 2", text)
+        self.assertNotIn("Beleg 3", text)
+        self.assertIn("Nichts gefunden", await (await self.c.get("/m/dokumente?q=gibtsnicht")).text())
+        r = await self.c.get("/m/dokumente/vorschau/2")
+        self.assertEqual((r.status, r.content_type), (200, "image/webp"))
+        # ohne Anmeldung: nichts davon
+        self.c.session.cookie_jar.clear()
+        for pfad in ("/m/dokumente", "/m/dokumente/vorschau/2"):
+            self.assertEqual((await self.c.get(pfad, allow_redirects=False)).status, 303, pfad)
 
 
 class Regeln(unittest.TestCase):

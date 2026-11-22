@@ -2,7 +2,7 @@
 
 Ein Dashboard fürs Heimnetz, das sich selbst aufbaut: Homie erkundet dein Netz (nur lesend), zeigt gefundene Dienste als Karten, und sobald du einen Dienst verbindest, schaltet sich das passende Modul ein – Tagesüberblick, Aufnahme mit lokaler KI, Gesundheit, Finanzen, Dokumente, Netzplan.
 
-**Stand: Etappe 1.** Installation, Anmeldung, Erkundung des Heimnetzes, Verbinden gefundener Dienste mit geprüften Schlüsseln und ein erster Netzplan. Die Inhalte der einzelnen Module folgen in Etappe 2.
+**Stand: Etappe 2 (begonnen).** Installation, Anmeldung, Erkundung des Heimnetzes, Verbinden mit geprüften Schlüsseln, Netzplan – und als erstes Modul mit Inhalt *Dokumente* (Paperless-ngx: Suche, neueste Dokumente, Vorschau). Die übrigen Module folgen einzeln.
 
 Homie ist für das Heimnetz gedacht. Bitte nicht ins Internet freigeben.
 
@@ -62,6 +62,8 @@ Ein Klick auf *Heimnetz erkunden* im Onboarding – nie von selbst. Homie liest 
 4. **Docker lesen:** welche Container auf diesem Rechner laufen, über den nur lesenden Zwischendienst.
 
 Homie meldet sich dabei nirgends an und ändert nichts. Das Ergebnis liegt ausschließlich im Datenordner.
+
+**Von Hand hinzufügen:** Dienste, die nur über einen Namen erreichbar sind (etwa hinter einem Proxy), findet die Suche nach Adressen nicht. Dafür gibt es im Onboarding ein Feld für die Adresse; Homie sieht dort nach, ob ein bekannter Dienst antwortet. Zusätzlich sieht die Erkundung sich alle Ports an, die Docker auf diesem Rechner veröffentlicht.
 
 **Verbinden:** Auf der Karte eines Dienstes trägst du seinen Schlüssel ein. Homie prüft ihn mit einem einzigen lesenden Aufruf bei genau diesem Dienst und legt ihn erst dann verschlüsselt ab. *Trennen* löscht ihn wieder.
 

@@ -45,14 +45,29 @@
 </div>
 {% endif %}
 
+{% if not beispiel and not erkundung.laeuft %}
+<details class="mehr hand"{% if hand %} open{% endif %}>
+  <summary>Ein Dienst fehlt? Von Hand hinzufügen</summary>
+  <form method="post" action="/dienst/neu" class="glas leer">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <p class="leiser">Manche Dienste sind nur über einen Namen erreichbar, etwa hinter einem Proxy. Trag die Adresse ein, unter der du den Dienst im Browser öffnest – Homie sieht nach, was dort läuft.</p>
+    {% if hand %}<p class="meldung" role="alert">{{ hand }}</p>{% endif %}
+    <label for="adresse">Adresse</label>
+    <input id="adresse" name="adresse" type="text" inputmode="url" placeholder="https://cloud.beispiel.de" autocapitalize="off" spellcheck="false" required>
+    <button type="submit">Nachsehen und hinzufügen</button>
+  </form>
+</details>
+{% endif %}
+
 {% if dienste %}
-<h2 class="gruppe"><span>Gefundene Dienste</span></h2>
+<h2 class="gruppe" id="dienste"><span>Gefundene Dienste</span></h2>
 <div class="raster">
   {% for d in dienste %}
   <article class="glas karte" id="dienst-{{ d.id }}" style="--c: {{ d.farbe }}">
     <header><h3>{{ d.name }}</h3><span class="chip {{ d.zustand }}">{{ d.zustand }}</span></header>
     <p class="leiser">{{ d.beschreibung }}{% if d.geraet %} · auf {{ d.geraet }}{% endif %}</p>
     {% if d.adresse %}<p class="adresse">{% if beispiel %}{{ d.adresse }}{% else %}<a href="{{ d.adresse }}" target="_blank" rel="noopener noreferrer">{{ d.adresse }}</a>{% endif %}</p>{% endif %}
+    {% if d.von_hand %}<p class="braucht">Von Hand hinzugefügt.</p>{% endif %}
     {% if d.vermisst %}<p class="braucht warnung">Bei der letzten Erkundung nicht mehr erreichbar.</p>{% endif %}
     {% if d.schaltet_frei %}<p class="braucht">Schaltet frei: {{ d.schaltet_frei }}</p>{% endif %}
     {% if kartenfehler.get(d.id) %}<p class="meldung" role="alert">{{ kartenfehler[d.id] }}</p>{% endif %}
