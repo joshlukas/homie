@@ -57,4 +57,6 @@ Ein vorgeschlagener Plan ist ein Entwurf. Lesen, bestätigen und ausführen kann
 | `homie/db.py`, `homie/config.py` | Datenbank im Datenordner, Einstellungen |
 | `tests/` | `python -m unittest discover -s tests -v` muss vor jeder Änderung und danach grün sein |
 
+Das Menüband ist für alle Seiten dasselbe: Vorlage `templates/_menue.html`, Aussehen `static/menue.css` (wird überall zuletzt geladen). Neue Seiten binden beides ein.
+
 Neue Seiten und API-Wege sind automatisch geschützt. Öffentlich sind nur die in `OEFFENTLICH` genannten Wege und der Briefkasten `POST /api/health-webhook` (nimmt nur unterschriebene Lieferungen an und reicht sie weiter) – diese Liste nicht erweitern.

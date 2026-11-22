@@ -446,4 +446,3 @@ document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("clic
 }));
 load();
 setInterval(load, 60000);
-document.querySelector(".menue [aria-current]")?.scrollIntoView({inline: "center", block: "nearest"});

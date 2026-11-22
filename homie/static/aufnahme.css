@@ -1,0 +1,29 @@
+/* Aufnahme – der große Knopf. Grundgestaltung der Seite, danach die Verfeinerungen aus dem gemeinsamen Design. */
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  display:flex;flex-direction:column;align-items:center;
+  padding:max(18px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(18px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+a{color:var(--sky);text-decoration:none}
+header{width:100%;max-width:520px;display:flex;justify-content:space-between;align-items:center;font-size:14px;color:var(--muted)}
+main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;width:100%;max-width:520px}
+#knopf{width:min(62vw,250px);aspect-ratio:1;border-radius:50%;border:4px solid var(--border);background:var(--surface);
+  color:var(--text);font:inherit;font-size:20px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;
+  --pegel:0;box-shadow:0 0 0 calc(var(--pegel)*34px) rgba(251,113,133,.22);transition:box-shadow .08s linear,background .2s}
+#knopf.laeuft{background:var(--bad);border-color:var(--bad);color:#1a0b10}
+#knopf:disabled{opacity:.5}
+#zeit{font-size:44px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;min-height:66px}
+#lage{min-height:48px;text-align:center;color:var(--muted);max-width:34ch}
+#lage.gut{color:var(--good)}#lage.warn{color:var(--warn)}#lage.schlecht{color:var(--bad)}
+footer{width:100%;max-width:520px;display:flex;flex-direction:column;gap:8px;align-items:center;font-size:14px;color:var(--muted)}
+#wartend{color:var(--warn)}
+#nachsenden{background:none;border:1px solid var(--border);color:var(--text);border-radius:999px;padding:8px 16px;font:inherit;font-size:14px}
+
+/* Verfeinerungen (im alten Dashboard kamen sie aus dem gemeinsamen Design und galten zuletzt) */
+#knopf { border: 0; color: #fff; font-family: var(--display); letter-spacing: 0.01em; background: var(--g-brand);
+  box-shadow: 0 0 0 calc(var(--pegel) * 34px) rgba(255, 95, 162, 0.2), 0 34px 70px -24px rgba(192, 92, 255, 0.8), 0 0 0 10px rgba(255, 255, 255, 0.04); }
+#knopf.laeuft { background: var(--g-pink); color: #fff; }
+#zeit { font-weight: 600; font-family: var(--display); }
+#nachsenden { background: var(--surface); border-color: var(--border-strong); cursor: pointer; }
+body.aufnahmeseite > header, body.aufnahmeseite > main, body.aufnahmeseite > footer { margin-left: auto; margin-right: auto; padding-left: 0; padding-right: 0; }
+body.aufnahmeseite > header { padding-top: 0; padding-bottom: 0; }

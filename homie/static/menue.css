@@ -1,0 +1,46 @@
+/* Das Menüband – auf jeder Seite dasselbe, an derselben Stelle. Diese Datei wird überall zuletzt geladen
+   und bringt alle Werte selbst mit, damit das Band unabhängig vom Aussehen der jeweiligen Seite gleich bleibt. */
+/* Platz für die Bildlaufleiste immer freihalten: sonst rückt das Band auf langen Seiten ein paar Pixel nach links. */
+html { scrollbar-gutter: stable; }
+body:has(> nav.menue) { padding-top: calc(58px + env(safe-area-inset-top, 0px) + 12px) !important; }
+nav.menue {
+  position: fixed; inset: 0 0 auto 0; z-index: 60; box-sizing: border-box; height: calc(58px + env(safe-area-inset-top, 0px)); margin: 0;
+  padding: env(safe-area-inset-top, 0px) max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+  display: grid; grid-template-columns: 1fr minmax(0, auto) 1fr; align-items: center; gap: 12px; flex-wrap: nowrap;
+  background: rgba(18, 21, 46, 0.62); -webkit-backdrop-filter: blur(26px) saturate(170%); backdrop-filter: blur(26px) saturate(170%);
+  border: 0; border-bottom: 1px solid rgba(255, 255, 255, 0.13); border-radius: 0;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 18px 40px -28px rgba(3, 4, 18, 0.9);
+  font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+nav.menue .marke { display: inline-flex; align-items: center; gap: 10px; justify-self: start; flex: none; color: #f6f7fd; text-decoration: none;
+  font: 700 16px/1.5 "Outfit", ui-sans-serif, system-ui, sans-serif; letter-spacing: -0.01em; }
+nav.menue .marke i { display: block; width: 26px; height: 26px; border-radius: 8px; background: linear-gradient(120deg, #6a5cff 0%, #c05cff 45%, #ff5fa2 75%, #ff8a6b 100%);
+  box-shadow: 0 8px 22px -8px rgba(192, 92, 255, 0.95); }
+nav.menue .marke span { background: none; -webkit-background-clip: border-box; background-clip: border-box; color: inherit; }
+nav.menue .tabs { display: inline-flex; gap: 2px; padding: 4px; margin: 0; order: 0; flex: none; justify-self: center; min-width: 0; max-width: 100%;
+  overflow-x: auto; scrollbar-width: none; border-radius: 999px; font-size: 13.5px; line-height: 1.5; color: #c3c7de; background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.10) inset; }
+nav.menue .tabs::-webkit-scrollbar { display: none; }
+nav.menue .tabs a { flex: none; padding: 8px 16px; border-radius: 999px; border: 0; background: none; box-shadow: none; transform: none;
+  color: #c3c7de; font: 600 13.5px/1.5 "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif; letter-spacing: 0; text-decoration: none; white-space: nowrap; }
+nav.menue .tabs a:hover { color: #f6f7fd; text-decoration: none; }
+nav.menue .tabs a[aria-current="page"] { background: linear-gradient(120deg, #6a5cff 0%, #c05cff 45%, #ff5fa2 75%, #ff8a6b 100%); color: #fff;
+  box-shadow: 0 8px 20px -8px rgba(192, 92, 255, 0.95); }
+nav.menue .abmelden { justify-self: end; margin: 0; flex: none; }
+nav.menue .abmelden button { display: inline-flex; align-items: center; min-height: 0; height: 34px; padding: 0 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.22); background: rgba(7, 9, 26, 0.34); color: #f6f7fd; box-shadow: none; transform: none; filter: none;
+  font: 600 13px/1 "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif; }
+nav.menue .abmelden button:hover { border-color: rgba(255, 255, 255, 0.4); transform: none; }
+@media (max-width: 900px) {
+  nav.menue { grid-template-columns: minmax(0, 1fr) auto; padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)); gap: 8px; }
+  nav.menue .marke { display: none; }
+  nav.menue .tabs { justify-self: start; }
+  nav.menue .tabs a { padding: 8px 11px; font-size: 13px; }
+}
+@media (max-width: 460px) {
+  nav.menue { padding-left: max(5px, env(safe-area-inset-left, 0px)); padding-right: max(5px, env(safe-area-inset-right, 0px)); gap: 6px; }
+  nav.menue .tabs { padding: 3px; }
+  nav.menue .tabs a { padding: 8px 9px; font-size: 12.5px; }
+  nav.menue .abmelden button { height: 32px; padding: 0 10px; font-size: 12px; }
+}
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) { nav.menue { background: rgba(18, 21, 46, 0.96); } }

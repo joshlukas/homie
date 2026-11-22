@@ -297,6 +297,5 @@
     else if (e.key === "Enter" || e.key === "o") lesen(Math.max(0, aktiv));
   });
 
-  document.querySelector(".menue [aria-current]")?.scrollIntoView({inline: "center", block: "nearest"});
   start();
 })();

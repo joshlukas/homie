@@ -9,13 +9,12 @@
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/schrift/schrift.css">
 <link rel="stylesheet" href="/static/mein-tag.css">
+<link rel="stylesheet" href="/static/menue.css">
+<script src="/static/menue.js" defer></script>
 <script src="/static/mein-tag.js" defer></script>
 </head>
 <body data-csrf="{{ csrf }}">
-<nav class="menue" aria-label="Hauptmenü"><a class="marke" href="/"><i></i><span>Homie</span></a><div class="tabs">
-{%- for m in menue %}<a href="{{ m.pfad }}"{% if pfad == m.pfad %} aria-current="page"{% endif %}>{{ m.titel }}</a>{% endfor %}
-{%- for s in eigene_seiten %}<a href="/s/{{ s.id }}">{{ s.titel }}</a>{% endfor %}</div>
-<form method="post" action="/logout" class="abmelden"><input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit">Abmelden</button></form></nav>
+{% include "_menue.html" %}
 
 <header>
   <div><h1>Mein Tag</h1><p id="sub">Lade …</p></div>

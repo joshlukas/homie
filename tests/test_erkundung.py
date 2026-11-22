@@ -404,12 +404,19 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         r = await self.c.post(f"/dienst/{d['id']}/verbinden", data={"csrf": self.csrf, "token": GUT}, allow_redirects=False)
         self.assertEqual(r.status, 303)
         self.assertTrue({"aufnahme", "finanzen"} <= self.aktiv())
-        # Aufnahme: eingeordnete Einträge, die rohe Aufnahme selbst wird nicht doppelt gezeigt
-        text = await (await self.c.get("/m/aufnahme")).text()
-        for erwartet in ("Heute", "Brot beim Bäcker", "Einkäufe und Ausgaben", "3,40 €", "Frage an die KI", "Antwort der KI", "Auftrag", "/static/aufnahme.js"):
+        # Aufnahme: der große Knopf wie im alten Dashboard; was daraus wurde, steht in „Mein Tag“
+        r = await self.c.get("/m/aufnahme")
+        text = await r.text()
+        self.assertEqual(r.status, 200)
+        for erwartet in ('id="knopf"', 'id="zeit"', 'id="nachsenden"', "Sprachnotiz", "/static/aufnahme.js", "/static/aufnahme.css", "data-csrf=", 'href="/m/aufnahme" aria-current="page"'):
             self.assertIn(erwartet, text)
-        self.assertNotIn("Rohtext der Aufnahme", text)
         self.assertNotIn(GUT, text)
+        skript = await (await self.c.get("/static/aufnahme.js")).text()
+        for erwartet in ("/m/aufnahme/senden", "X-Homie-CSRF", "indexedDB", "wakeLock"):
+            self.assertIn(erwartet, skript)
+        self.assertNotIn("serviceWorker", skript)
+        d = await (await self.c.get("/api/tag?tage=30")).json()                 # die Einträge selbst
+        self.assertEqual([e["text"] for e in d["eintraege"]][:2], ["Rohtext der Aufnahme", "Brot beim Bäcker"])
         # Aufnahme abgeben: nur mit Sicherheitsmarke, nur Ton, wird an den Assistenten durchgereicht
         self.assertEqual((await self.c.post("/m/aufnahme/senden", data=ton, headers={"Content-Type": "audio/webm"})).status, 403)
         self.assertEqual((await self.c.post("/m/aufnahme/senden", data=b"x" * 3000, headers={"Content-Type": "text/plain", "X-Homie-CSRF": self.csrf})).status, 415)

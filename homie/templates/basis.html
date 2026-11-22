@@ -9,25 +9,13 @@
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/schrift/schrift.css">
 <link rel="stylesheet" href="/static/homie.css">
+<link rel="stylesheet" href="/static/menue.css">
+<script src="/static/menue.js" defer></script>
 {% block kopf %}{% endblock %}
 </head>
 <body class="{% block koerper %}{% endblock %}">
 {% if csrf %}
-<header class="menue">
-  <a class="marke" href="/"><span class="logo" aria-hidden="true">H</span><b>Homie</b></a>
-  <nav class="tabs" aria-label="Bereiche">
-    {% for m in menue %}
-    <a href="{{ m.pfad }}"{% if pfad == m.pfad %} aria-current="page"{% endif %}>{{ m.titel }}</a>
-    {% endfor %}
-    {% for s in eigene_seiten %}
-    <a href="/s/{{ s.id }}"{% if pfad == '/s/' ~ s.id %} aria-current="page"{% endif %}>{{ s.titel }}</a>
-    {% endfor %}
-  </nav>
-  <form method="post" action="/logout" class="abmelden">
-    <input type="hidden" name="csrf" value="{{ csrf }}">
-    <button type="submit" class="leise">Abmelden</button>
-  </form>
-</header>
+{% include "_menue.html" %}
 {% endif %}
 <main>
 {% block inhalt %}{% endblock %}

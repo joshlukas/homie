@@ -7,7 +7,7 @@ Ein Dashboard fürs Heimnetz, das sich selbst aufbaut: Homie erkundet dein Netz 
 - **Mein Tag** – die große Tagesseite: was diesen Monat noch frei ist, Konten, Trainings, Schritte, Termine, deine eingesprochenen Notizen nach Themen, Vorschläge zum Bestätigen
 - **Gesundheit** – Schritte, Puls, Schlaf und mehr aus der Home-Assistant-App des Handys, mit Wochenverlauf
 - **Dokumente** – der Dokumentstream für Paperless-ngx: ein Dokument je Bildschirm mit Zeitachse, Raster nach Monaten, Suche in Titel und Volltext, Filter nach Jahr, Art, Absender und Schlagwort, Leser für das ganze PDF, Herunterladen; alles auch per Tastatur
-- **Aufnahme** – Sprachnotiz aufnehmen und sehen, was der Notiz-Assistent daraus gemacht hat
+- **Aufnahme** – der große Aufnahmeknopf: nimmt auf, sichert alle paar Sekunden im Gerät und sendet nach, sobald Homie wieder erreichbar ist
 - **Finanzen** – Spielraum im Monat, Konten, Einnahmen und Ausgaben, kommende Posten, geteilte Ausgaben
 - **Assistent** – Profil, das der Notiz-Assistent pflegt, und Kosten der KI-Hilfe von außen
 - **Übersicht** – Startseite: alle Dienste mit ihrem Zustand in diesem Augenblick

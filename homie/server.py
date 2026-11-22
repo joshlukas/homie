@@ -457,13 +457,8 @@ async def _seite_gesundheit(request: web.Request, modul: module.Modul) -> web.Re
 
 
 async def _seite_aufnahme(request: web.Request, modul: module.Modul) -> web.Response:
-    zugang = _zugang(request.app, "assistent", ("token",))
-    daten, fehler = None, ""
-    try:
-        daten = await assistent.eintraege(zugang[0], zugang[1]["token"])
-    except assistent.AssistentFehler as e:
-        fehler = str(e)
-    return _seite(request, "aufnahme.html", status=200 if daten else 502, modul=modul, daten=daten, fehler=fehler)
+    """Der große Aufnahmeknopf. Was daraus geworden ist, steht in „Mein Tag“."""
+    return _seite(request, "aufnahme.html", modul=modul)
 
 
 async def _seite_assistent(request: web.Request, modul: module.Modul) -> web.Response:

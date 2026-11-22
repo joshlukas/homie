@@ -1,37 +1,32 @@
-{% extends "basis.html" %}
-{% block titel %}Homie – Aufnahme{% endblock %}
-{% block kopf %}<script src="/static/aufnahme.js" defer></script>{% endblock %}
-{% block inhalt %}
-<section class="kopf">
-  <h1>Aufnahme</h1>
-  <p class="leiser">Sprich eine Notiz ein. Der Notiz-Assistent schreibt mit, ordnet ein und legt sie ab; hier siehst du, was daraus geworden ist.</p>
-</section>
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121530">
+<meta name="robots" content="noindex, nofollow">
+<title>Homie – Aufnahme</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/schrift/schrift.css">
+<link rel="stylesheet" href="/static/mein-tag.css">
+<link rel="stylesheet" href="/static/aufnahme.css">
+<link rel="stylesheet" href="/static/menue.css">
+<script src="/static/menue.js" defer></script>
+<script src="/static/aufnahme.js" defer></script>
+</head>
+<body class="aufnahmeseite" data-csrf="{{ csrf }}">
+{% include "_menue.html" %}
 
-<div class="glas leer rekorder" id="rekorder" data-csrf="{{ csrf }}">
-  <button type="button" id="aufnehmen" class="rund" aria-pressed="false" disabled><span class="punkt" aria-hidden="true"></span><span id="aufnehmen-text">Aufnehmen</span></button>
-  <p id="aufnahme-stand" class="leiser" role="status">Zum Aufnehmen wird das Mikrofon dieses Geräts gebraucht.</p>
-  <p id="aufnahme-unsicher" class="meldung" hidden>Der Browser gibt das Mikrofon nur auf einer gesicherten Seite frei (Adresse mit https). Öffne Homie dafür über eine https-Adresse, zum Beispiel über deinen Proxy.</p>
-</div>
-
-<h2 class="gruppe"><span>Aus deinen Notizen</span></h2>
-{% if fehler %}
-<div class="glas leer"><h3>Gerade keine Einträge</h3><p class="meldung" role="alert">{{ fehler }}</p></div>
-{% elif not daten.tage %}
-<div class="glas leer"><h3>Noch nichts</h3><p class="leiser">In den letzten {{ daten.spanne }} Tagen gibt es keine Einträge.</p></div>
-{% else %}
-{% for t in daten.tage %}
-<div class="glas tagkarte">
-  <h3>{{ t.name }}</h3>
-  <ul class="notizen">
-    {% for e in t.eintraege %}
-    <li>
-      <div class="kopfzeile"><span class="chip">{{ e.art }}</span>{% if e.betrag %}<span class="chip gefunden">{{ e.betrag }}</span>{% endif %}<time>{{ e.zeit }}</time></div>
-      <p>{{ e.text }}</p>
-      {% if e.antwort %}<p class="antwort">{{ e.antwort }}</p>{% endif %}
-    </li>
-    {% endfor %}
-  </ul>
-</div>
-{% endfor %}
-{% endif %}
-{% endblock %}
+<header><span>Sprachnotiz</span></header>
+<main>
+  <div id="zeit" aria-live="off">0:00</div>
+  <button id="knopf" type="button">Aufnehmen</button>
+  <div id="lage" role="status">Tippen startet die Aufnahme.</div>
+</main>
+<footer>
+  <div id="wartend" hidden></div>
+  <button id="nachsenden" type="button" hidden>Jetzt nachsenden</button>
+  <div id="wach"></div>
+</footer>
+</body>
+</html>

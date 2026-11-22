@@ -52,26 +52,12 @@ footer { text-align: center; color: var(--faint); font-size: 12.5px; padding: 0 
   -webkit-backdrop-filter: var(--unscharf); backdrop-filter: var(--unscharf);
 }
 @supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
-  .glas, .menue { background: var(--surface); }
+  .glas { background: var(--surface); }
 }
 
-/* ---------- Menü ---------- */
-.menue {
-  position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 12px;
-  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
-  background: rgba(18, 21, 46, 0.62); border-bottom: 1px solid var(--glas-kante);
-  -webkit-backdrop-filter: blur(26px) saturate(170%); backdrop-filter: blur(26px) saturate(170%);
-}
-.marke { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); flex: none; }
-.marke b { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; background: var(--g-brand); -webkit-background-clip: text; background-clip: text; color: transparent; }
+/* ---------- Zeichen auf der Anmeldeseite (das Menüband steht in menue.css) ---------- */
 .logo { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: var(--g-brand); color: #fff; font-weight: 700; box-shadow: 0 12px 28px -10px rgba(192, 92, 255, 0.8); }
 .logo.gross { width: 54px; height: 54px; border-radius: 16px; font-size: 26px; }
-.tabs { display: flex; gap: 2px; padding: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--glas-kante); overflow-x: auto; min-width: 0; scrollbar-width: none; }
-.tabs::-webkit-scrollbar { display: none; }
-.tabs a { flex: none; padding: 7px 15px; border-radius: 999px; color: var(--muted); font-size: 13.5px; font-weight: 600; text-decoration: none; }
-.tabs a:hover { color: var(--text); }
-.tabs a[aria-current="page"] { background: var(--g-brand); color: #fff; box-shadow: 0 8px 18px -8px rgba(192, 92, 255, 0.9); }
-.abmelden { margin: 0 0 0 auto; flex: none; }
 
 /* ---------- Knöpfe und Eingaben ---------- */
 button, .knopf {
@@ -135,8 +121,6 @@ body.tor main { display: grid; place-items: center; }
 .stand.aus { color: var(--faint); }
 
 @media (max-width: 640px) {
-  .menue { flex-wrap: wrap; row-gap: 8px; }
-  .tabs { order: 3; flex: 1 1 100%; }
   .schritte { grid-template-columns: repeat(2, 1fr); }
   .raster { grid-template-columns: 1fr; }
 }

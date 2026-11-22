@@ -91,6 +91,11 @@ class Web(unittest.IsolatedAsyncioTestCase):
         z = await (await self.c.get("/api/zustand")).json()
         self.assertEqual(z["module_aktiv"], ["uebersicht", "onboarding"])
         self.assertEqual(z["erkundung"], {"docker": "aus"})
+        # ein Menüband für alle Seiten: gleiche Vorlage, gleiches Aussehen, zuletzt geladen
+        self.assertIn('<nav class="menue" aria-label="Hauptmenü"><a class="marke" href="/"><i></i><span>Homie</span></a>', text)
+        self.assertLess(text.index("/static/homie.css"), text.index("/static/menue.css"))
+        self.assertEqual((await self.c.get("/static/menue.css")).status, 200)
+        self.assertNotIn(".menue", await (await self.c.get("/static/homie.css")).text())
         # Schriften liefert Homie selbst aus – keine Anfrage ins Internet
         self.assertIn('href="/static/schrift/schrift.css"', text)
         r = await self.c.get("/static/schrift/schrift.css")
