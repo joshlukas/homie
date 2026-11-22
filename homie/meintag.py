@@ -63,9 +63,12 @@ async def _gesundheit(s, helfer: _Quelle, ha: _Quelle, tage: int, tz) -> dict | 
             kennung = z.get("entity_id", "")
             if not kennung.startswith("sensor."):
                 continue
-            for name, endung in JETZT.items():
-                if kennung.endswith("_" + endung) and (name not in sensoren or z.get("last_updated", "") > sensoren[name].get("last_updated", "")):
-                    sensoren[name] = z
+            # längste Endung zuerst: „…_resting_heart_rate“ ist der Ruhepuls, nicht der Puls
+            for name, endung in sorted(JETZT.items(), key=lambda x: -len(x[1])):
+                if kennung.endswith("_" + endung):
+                    if name not in sensoren or z.get("last_updated", "") > sensoren[name].get("last_updated", ""):
+                        sensoren[name] = z
+                    break
         for name, z in sensoren.items():
             wert = _zahl(z.get("state"))
             if wert is not None:

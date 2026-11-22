@@ -69,7 +69,7 @@ HA = {
         {"entity_id": "sensor.altes_handy_daily_steps", "state": "12", "last_updated": "2020-01-01T10:00:00+00:00"},
         {"entity_id": "sensor.handy_daily_distance", "state": "6240", "last_updated": "2020-01-01T10:00:00+00:00"},
         {"entity_id": "sensor.handy_heart_rate", "state": "61", "last_updated": "2020-01-01T10:00:00+00:00"},
-        {"entity_id": "sensor.handy_resting_heart_rate", "state": "unknown"},
+        {"entity_id": "sensor.handy_resting_heart_rate", "state": "unknown", "last_updated": dt.datetime.now(dt.timezone.utc).isoformat()},
     ]),
     "/api/history/period/{start}": _ha(lambda r: [
         [{"entity_id": "sensor.handy_daily_steps", "state": "3000", "last_changed": dt.datetime.now(dt.timezone.utc).isoformat()},

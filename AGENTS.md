@@ -45,7 +45,8 @@ Ein vorgeschlagener Plan ist ein Entwurf. Lesen, bestätigen und ausführen kann
 | `homie/katalog.py` | bekannte Dienste: Erkennungsmerkmal, nötige Schlüssel, was sie freischalten |
 | `homie/erkundung.py` | Erkundung des Heimnetzes, nur lesend |
 | `homie/verbinden.py` | Schlüssel beim Dienst prüfen, bevor er abgelegt wird |
-| `homie/tag.py`, `homie/gesundheit.py` | Module Mein Tag und Gesundheit: lesen Home Assistant |
+| `homie/meintag.py` | trägt für „Mein Tag“ alles in einer Antwort zusammen (`/api/tag`); die Seite dazu ist `static/mein-tag.js` |
+| `homie/gesundheit.py`, `homie/tag.py` | Modul Gesundheit: liest Home Assistant; Zeitzone |
 | `homie/assistent.py` | Module Aufnahme, Finanzen, Assistent: lesen den Notiz-Assistenten; geben neue Aufnahmen und Entscheidungen zu Vorschlägen an ihn weiter |
 | `homie/dokumente.py` | Modul Dokumente: liest Paperless-ngx (nur lesend, nichts wird gespeichert) |
 | `homie/proxmox.py` | Proxmox lesen (VMs, Container, Speicher) |

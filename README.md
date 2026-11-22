@@ -4,7 +4,7 @@ Ein Dashboard fürs Heimnetz, das sich selbst aufbaut: Homie erkundet dein Netz 
 
 **Stand: Etappe 3 (begonnen).** Installation, Anmeldung, Erkundung des Heimnetzes, Verbinden mit geprüften Schlüsseln, Netzplan mit virtuellen Maschinen, Pläne für neue VMs samt Ausführen nach Bestätigung, Schnittstelle für helfende Agenten – und diese Seiten mit Inhalt:
 
-- **Mein Tag** – Termine, Aufgaben und Wetter aus Home Assistant
+- **Mein Tag** – die große Tagesseite: was diesen Monat noch frei ist, Konten, Trainings, Schritte, Termine, deine eingesprochenen Notizen nach Themen, Vorschläge zum Bestätigen
 - **Gesundheit** – Schritte, Puls, Schlaf und mehr aus der Home-Assistant-App des Handys, mit Wochenverlauf
 - **Dokumente** – Paperless-ngx: Suche, neueste Dokumente, Vorschau
 - **Aufnahme** – Sprachnotiz aufnehmen und sehen, was der Notiz-Assistent daraus gemacht hat
