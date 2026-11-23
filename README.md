@@ -1,19 +1,104 @@
 # Homie
 
-Ein Dashboard fürs Heimnetz, das sich selbst aufbaut: Homie erkundet dein Netz (nur lesend), zeigt gefundene Dienste als Karten, und sobald du einen Dienst verbindest, schaltet sich das passende Modul ein – Tagesüberblick, Aufnahme mit lokaler KI, Gesundheit, Finanzen, Dokumente, Netzplan.
+**Ein Dashboard fürs Heimnetz, das sich selbst aufbaut.** Du startest ein fertiges Image, legst ein Passwort an und gehst durch das Onboarding: Homie erkundet dein Heimnetz (nur lesend), zeigt gefundene Dienste als Karten, und sobald du einen Dienst verbindest, schaltet sich das passende Modul ein. Alles läuft bei dir zu Hause; Homie liest die verbundenen Dienste und speichert deren Inhalte nicht.
 
-**Stand: Etappe 3 (begonnen).** Installation, Anmeldung, Erkundung des Heimnetzes, Verbinden mit geprüften Schlüsseln, Netzplan mit virtuellen Maschinen, Pläne für neue VMs samt Ausführen nach Bestätigung, Schnittstelle für helfende Agenten – und diese Seiten mit Inhalt:
+[![Rundgang durch Homie – zum Video](docs/bilder/rundgang.gif)](docs/homie-rundgang.mp4)
 
-- **Mein Tag** – die große Tagesseite: was diesen Monat noch frei ist, Konten, Trainings, Schritte, Termine, deine eingesprochenen Notizen nach Themen, Vorschläge zum Bestätigen
-- **Gesundheit** – Schritte, Puls, Schlaf und mehr aus der Home-Assistant-App des Handys, mit Wochenverlauf
-- **Dokumente** – der Dokumentstream für Paperless-ngx: ein Dokument je Bildschirm mit Zeitachse, Raster nach Monaten, Suche in Titel und Volltext, Filter nach Jahr, Art, Absender und Schlagwort, Leser für das ganze PDF, Herunterladen; alles auch per Tastatur
-- **Aufnahme** – der große Aufnahmeknopf: nimmt auf, sichert alle paar Sekunden im Gerät und sendet nach, sobald Homie wieder erreichbar ist
-- **Finanzen** – Spielraum im Monat, Konten, Einnahmen und Ausgaben, kommende Posten, geteilte Ausgaben
-- **Blueprint** – dein Heimnetz an einem Ort, mit den Bereichen *Plan* (eine eigene, handgeschriebene Seite), *Dienste* (Zustand aller Dienste in diesem Augenblick), *Netz* (Geräte, Dienste, virtuelle Maschinen, Container) und *Assistent* (Profil und Kosten der KI-Hilfe)
+▶ **[Video: Rundgang in zwei Minuten](docs/homie-rundgang.mp4)** – was Homie macht und wie man es benutzt, aus Sicht eines Nutzers. (Das Bild oben ist die Kurzfassung im Zeitraffer.)
 
-*Aufnahme* und *Finanzen* setzen einen eigenen Dienst voraus (den „Notiz-Assistenten“, der Sprachnotizen mit lokaler KI verschriftlicht und Kontoumsätze auswertet); er gehört noch nicht zu Homie. Alle Module lesen nur und speichern keine Inhalte. Zwei Ausnahmen, beide nur auf deinen Klick: Eine neue Sprachaufnahme wird an den Notiz-Assistenten abgegeben, und wenn du einen seiner Vorschläge annimmst oder ablehnst (Training, geteilte Ausgabe, Profil), gibt Homie diese Entscheidung an ihn weiter. Der Aufnahmeknopf braucht eine https-Adresse, weil Browser das Mikrofon sonst nicht freigeben.
+> Alle Bilder und das Video stammen aus der mitgelieferten Demo mit **erfundenen Daten** (`python scripts/demo.py`). Namen, Beträge, Dokumente und Geräte sind ausgedacht.
 
-Homie ist für das Heimnetz gedacht. Bitte nicht ins Internet freigeben.
+## Was du damit machst
+
+| | |
+|---|---|
+| **Mein Tag** – das Wichtigste auf einen Blick: was diesen Monat noch frei ist, Konten, Training der Woche, Schritte, Termine, Aufgaben. Darunter alles, was du eingesprochen hast, nach Themen geordnet. | ![Mein Tag](docs/bilder/mein-tag.webp) |
+| **Trainingskalender** – jede Woche zählt von Montag bis Sonntag gegen dein Ziel; dazu Monate und Jahre im Vergleich. | ![Trainingskalender](docs/bilder/mein-tag-koerper.webp) |
+| **Aufnahme** – ein großer Knopf für die Sprachnotiz. Daneben: Kassenbon fotografieren oder Kontoauszug hochladen. Was nicht gleich ankommt, bleibt im Gerät und wird nachgesendet. | ![Aufnahme](docs/bilder/aufnahme.webp) |
+| **Dokumente** – dein Paperless-ngx-Archiv als Stream: ein Dokument je Bildschirm, mit Zeitachse, Suche im Volltext, Filtern und Leser für das ganze PDF. | ![Dokumente als Stream](docs/bilder/dokumente.webp) |
+| … oder als **Raster** nach Monaten. | ![Dokumente als Raster](docs/bilder/dokumente-raster.webp) |
+| **Finanzen** – Spielraum im Monat, Konten, Einnahmen und Ausgaben, kommende Posten, geteilte Ausgaben. | ![Finanzen](docs/bilder/finanzen.webp) |
+| **Gesundheit** – Schritte, Puls, Schlaf und mehr aus der Home-Assistant-App des Handys, mit Wochenverlauf. | ![Gesundheit](docs/bilder/gesundheit.webp) |
+| **Blueprint** – dein Heimnetz an einem Ort: ein eigener, handgeschriebener *Plan*, der Zustand aller *Dienste*, das *Netz* mit Geräten, VMs und Containern, und der *Assistent*. | ![Blueprint: Dienste](docs/bilder/blueprint-dienste.webp) |
+| **Onboarding** – hier lernt Homie dein Heimnetz kennen: erkunden, Dienst verbinden, Modul erscheint. | ![Onboarding](docs/bilder/onboarding.webp) |
+
+Am Handy sieht es so aus:
+
+<p>
+<img src="docs/bilder/handy-aufnahme.webp" width="30%" alt="Aufnahme am Handy">
+<img src="docs/bilder/handy-mein-tag.webp" width="30%" alt="Mein Tag am Handy">
+<img src="docs/bilder/handy-dokumente.webp" width="30%" alt="Dokumente am Handy">
+</p>
+
+## So läuft es ab
+
+### Vom Start bis zum fertigen Dashboard
+
+```mermaid
+flowchart LR
+    A["Stack anlegen<br>(Portainer oder docker compose)"] --> B["Homie öffnen,<br>Passwort anlegen"]
+    B --> C["Onboarding:<br>Heimnetz erkunden"]
+    C --> D["Gefundene Dienste<br>erscheinen als Karten"]
+    D --> E["Dienst verbinden:<br>Schlüssel eintragen,<br>Homie prüft ihn"]
+    E --> F["Passendes Modul<br>schaltet sich ein"]
+    F --> D
+```
+
+Kein Dienst, kein Modul: Homie zeigt nur, was bei dir wirklich vorhanden und verbunden ist. Schlüssel liegen verschlüsselt im Datenordner der Installation, nie im Programm.
+
+### Vom gesprochenen Satz zum Eintrag
+
+```mermaid
+flowchart LR
+    U["Du sprichst eine Notiz ein<br>oder fotografierst einen Beleg"] --> H["Homie<br>(Seite Aufnahme)"]
+    H -->|reicht nur weiter| N["Notiz-Assistent<br>im Heimnetz"]
+    N --> K["Lokale KI:<br>mitschreiben, Foto lesen,<br>einordnen"]
+    K --> G["Einkauf → geteilte<br>Haushaltskasse"]
+    K --> Y["Serie oder Film →<br>Serien-Verwaltung"]
+    K --> T["Training →<br>Trainingskalender"]
+    K --> M["Aufgabe, Termin,<br>Notiz, Frage"]
+    G --> MT["Mein Tag"]
+    Y --> MT
+    T --> MT
+    M --> MT
+```
+
+Ein Beispiel: „Beim Bäcker zwei Brötchen für 4,30“ wird ein Eintrag unter *Essen und Trinken* und – wenn du eine geteilte Haushaltskasse führst – eine Ausgabe dort. „Gestern zwei Folgen von … geschaut“ landet mit dem richtigen Tag in der Serien-Verwaltung. Ein fotografierter Kassenbon wird gelesen und genauso eingeordnet.
+
+### Wer mit wem spricht
+
+```mermaid
+flowchart TB
+    subgraph Heimnetz
+        B["Browser / Handy"] -->|Anmeldung mit Passwort| HO["Homie"]
+        HO -->|liest| HA["Home Assistant<br>Kalender, Gesundheitswerte"]
+        HO -->|liest| PL["Paperless-ngx<br>Dokumente"]
+        HO -->|liest, reicht Aufnahmen weiter| NA["Notiz-Assistent<br>Sprachnotizen, Finanzen"]
+        HO -->|liest| PX["Proxmox<br>VMs und Container"]
+        HO -.->|nur lesend, über Zwischendienst| DO["Docker auf dem Rechner"]
+        NA -->|trägt Gesehenes ein| HO
+        HO -.->|freiwilliger Helfer| YT["Yamtrack"]
+    end
+    Internet["Internet"] x--x HO
+```
+
+Homie ist für das Heimnetz gedacht. **Bitte nicht ins Internet freigeben.**
+
+## Was du brauchst – und was nicht dabei ist
+
+- Einen Linux-Rechner mit Docker (Mini-PC, VM, NAS). Mehr braucht Homie selbst nicht.
+- Module erscheinen nur für Dienste, die du schon betreibst: **Home Assistant** (Mein Tag, Gesundheit), **Paperless-ngx** (Dokumente), **Proxmox** (Netzplan mit VMs).
+- *Aufnahme*, *Finanzen* und die eingesprochenen Einträge in *Mein Tag* setzen einen eigenen Dienst voraus, den **Notiz-Assistenten**: Er verschriftlicht Sprachnotizen mit lokaler KI, liest Fotos, wertet Kontoauszüge aus und trägt in andere Dienste ein. **Dieser Dienst gehört nicht zu diesem Repository.** Homie spricht mit ihm über eine kleine Schnittstelle (`/api/eintraege`, `/api/finanzen`, `/api/aufnahme` …); wer sie nachbaut, kann die Module nutzen. Wie die Antworten aussehen, zeigt [scripts/demo.py](scripts/demo.py).
+- Alle Module lesen nur und speichern keine Inhalte. Ausnahmen, jeweils nur auf deinen Klick: Eine Aufnahme, ein Foto oder ein Kontoauszug wird an den Notiz-Assistenten abgegeben, und wenn du einen seiner Vorschläge annimmst oder ablehnst, gibt Homie diese Entscheidung weiter. Der Aufnahmeknopf braucht eine https-Adresse, weil Browser das Mikrofon sonst nicht freigeben.
+
+## Erst ansehen, dann installieren
+
+```bash
+pip install -r requirements.txt
+python scripts/demo.py        # → http://127.0.0.1:8095, Passwort steht in der Ausgabe
+```
+
+Die Demo startet Homie mit erfundenen Daten und nachgestellten Diensten, nur auf deinem Rechner.
 
 ## Installation in drei Schritten
 
@@ -38,12 +123,12 @@ Lege das Passwort gleich nach dem Start an: Bis dahin könnte es jeder in deinem
 | | Sichtbarkeit | Inhalt |
 |---|---|---|
 | Image `ghcr.io/joshlukas/homie` | öffentlich | nur das Programm – keine Daten, keine Schlüssel, keine Adressen |
-| Dieses Repository | privat | Quelltext und seine Geschichte |
+| Dieses Repository | öffentlich | Quelltext und seine Geschichte – nur Programm, Beispielkonfiguration und erfundene Demo-Daten |
 | Datenordner der Installation | nur auf deinem Rechner | alles Persönliche |
 
 **Woher kommt das Image?** GitHub baut es bei jeder Änderung automatisch aus diesem Quelltext ([.github/workflows/image.yml](.github/workflows/image.yml)). Vorher laufen die Tests und die Privat-Prüfung: Steht im Repository eine Heimnetz-Adresse, ein Schlüssel oder eine E-Mail-Adresse, wird nichts gebaut und nichts veröffentlicht.
 
-**Stack direkt aus dem Repository (optional):** In Portainer geht statt *Web editor* auch *Repository* (`https://github.com/joshlukas/homie`). Weil das Repository privat ist, braucht das ein GitHub-Token mit Lesezugriff auf dieses Repository (*Fine-grained token*, *Contents: Read-only*), das **du selbst** unter *Authentication* einträgst – nie in einen Chat. Dasselbe gilt für `git clone`. Dafür lässt sich Homie dann auch ohne das Image vor Ort bauen.
+**Stack direkt aus dem Repository (optional):** In Portainer geht statt *Web editor* auch *Repository* (`https://github.com/joshlukas/homie`). Mit `git clone` lässt sich Homie auch ohne das Image vor Ort bauen.
 
 ## Was wo liegt
 
