@@ -20,7 +20,7 @@ function render(d) {
   const aufnahmen = by("aufnahme"), aufgaben = by("aufgabe"), essen = by("essen"), einkauf = by("einkauf"), sport = by("sport");
   const geld = [...essen, ...einkauf].reduce((s, e) => s + (e.daten.betrag_eur || 0), 0);
   const minuten = sport.reduce((s, e) => s + (e.daten.dauer_min || 0), 0), km = sport.reduce((s, e) => s + (e.daten.distanz_km || 0), 0);
-  $("#sub").textContent = `${aufnahmen.length} Aufnahmen · ${d.tage === 1 ? "heute" : "letzte " + d.tage + " Tage"}`;
+  $("#sub").textContent = `${aufnahmen.length} Aufnahmen und Fotos · ${d.tage === 1 ? "heute" : "letzte " + d.tage + " Tage"}`;
   const nf = (n, digits = 0) => n.toLocaleString("de-DE", {maximumFractionDigits: digits});
   const cards = [];
   const C = d.claude;
@@ -203,7 +203,7 @@ function render(d) {
     {empty: "Nichts offen.", note: "Sonnet antwortet, bei Bedarf Opus"}));
   cards.push(card("Fragen und Antworten (lokales Modell)", "var(--teal)", by("frage").map((e) => `<li>${esc(e.text)}<small>→ ${esc(e.daten.antwort)}</small></li>`)));
   cards.push(card("Aufnahmen", "var(--faint)", aufnahmen.map((e) =>
-    `<li>${esc(e.text)}<small>${fmtTime(e.zeit)} · ${Math.floor((e.daten.sekunden || 0) / 60)}:${String((e.daten.sekunden || 0) % 60).padStart(2, "0")} min${e.daten.privat ? " · privat" : ""}</small><details><summary>Wortlaut</summary><p>${esc(e.daten.wortlaut)}</p></details></li>`),
+    `<li>${esc(e.text)}<small>${fmtTime(e.zeit)} · ${e.daten.foto ? "Foto" : Math.floor((e.daten.sekunden || 0) / 60) + ":" + String((e.daten.sekunden || 0) % 60).padStart(2, "0") + " min"}${e.daten.privat ? " · privat" : ""}</small><details><summary>${e.daten.foto ? "Bildbeschreibung" : "Wortlaut"}</summary><p>${esc(e.daten.wortlaut)}</p></details></li>`),
     {wide: true, empty: "Noch keine Aufnahme im gewählten Zeitraum."}));
   // ---------- Lage: je Bereich der Ist-Wert und, wo es Sinn ergibt, die Prognose ----------
   const lage = [], eurR = (v) => nf(Math.round(v), 0) + " €", ton = {gruen: "var(--good)", gelb: "var(--warn)", rot: "var(--bad)"};

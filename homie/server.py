@@ -15,7 +15,7 @@ import jinja2
 from aiohttp import web
 from yarl import URL
 
-from . import agenten, assistent, ausfuehren, dokumente, gesundheit, katalog, meintag, module, plaene, proxmox, verbinden
+from . import agenten, assistent, ausfuehren, dokumente, gesundheit, katalog, meintag, module, plaene, proxmox, verbinden, yamtrack
 from .ablage import Ablage
 from .anmeldung import COOKIE, MIN_LAENGE, Anmeldung, passwort_maengel
 from .config import PAKET, VERSION, Einstellungen
@@ -42,6 +42,7 @@ K_LAUF = web.AppKey("lauf", dict)
 K_MARKEN = web.AppKey("marken", dict)       # kurzlebige Marken für den Rahmen mit dem eigenen Plan: Marke → gültig bis
 K_BRIEFE = web.AppKey("briefe", dict)       # Bremse für den Briefkasten der Gesundheits-App: Absender → Zeitpunkte
 BRIEFKASTEN = "/api/health-webhook"
+YAMTRACK_WEG = "/api/yamtrack"
 
 
 def _ist_api(request: web.Request) -> bool:
@@ -110,6 +111,9 @@ async def torwaechter(request: web.Request, handler):
     if request.path == BRIEFKASTEN and request.method == "POST":
         # Die Gesundheits-App am Handy hat keine Anmeldung bei Homie. Sie weist sich mit ihrer Unterschrift aus,
         # die der Notiz-Assistent prüft – ohne Unterschrift nimmt schon Homie nichts an.
+        return await handler(request)
+    if request.path == YAMTRACK_WEG and request.method == "POST":
+        # Der Notiz-Assistent trägt Gesehenes ein. Er weist sich mit dem Schlüssel aus, den Homie für ihn verwahrt.
         return await handler(request)
     anm = request.app[K_ANM]
     sitzung = anm.sitzung_finden(request.cookies.get(COOKIE))
@@ -593,6 +597,53 @@ async def briefkasten(request: web.Request) -> web.Response:
     return web.Response(body=antwort, status=status, content_type="application/json", charset="utf-8")
 
 
+async def api_yamtrack(request: web.Request) -> web.Response:
+    """Titel suchen und Gesehenes eintragen – nur für den verbundenen Notiz-Assistenten, nur wenn der Helfer eingeschaltet ist."""
+    app = request.app
+    zugang = _zugang(app, "assistent", ("token",))
+    ausweis = request.headers.get("Authorization", "")
+    if zugang is None or not hmac.compare_digest(ausweis.encode(), f"Bearer {zugang[1]['token']}".encode()):
+        return web.json_response({"fehler": "nicht angemeldet"}, status=401)
+    if not app[K_EINST].yamtrack_helfer:
+        return web.json_response({"ok": False, "fehler": "Das Eintragen in Yamtrack ist in Homie nicht eingeschaltet."}, status=503)
+    try:
+        auftrag = json.loads(await request.read())      # höchstens 64 KB, das begrenzt schon der Server
+    except ValueError:
+        return web.json_response({"ok": False, "fehler": "kein JSON"}, status=400)
+    ergebnis = await yamtrack.auftrag(app[K_EINST].yamtrack_helfer, auftrag)
+    meintag._merker.clear()
+    return web.json_response(ergebnis, dumps=lambda o: json.dumps(o, ensure_ascii=False))
+
+
+async def _roh(request: web.Request, grenze: int) -> bytes | None:
+    """Liest den Inhalt eines Aufrufs bis zur Grenze; None, wenn er größer ist."""
+    inhalt = bytearray()
+    async for stueck in request.content.iter_chunked(65536):
+        inhalt.extend(stueck)
+        if len(inhalt) > grenze:
+            return None
+    return bytes(inhalt)
+
+
+async def finanzen_import(request: web.Request) -> web.Response:
+    """Nimmt einen Kontoauszug (CSV oder Excel) aus dem Browser an und gibt ihn dem Notiz-Assistenten. Homie behält nichts."""
+    aktiv = any(s.aktiv and s.modul.id == "finanzen" for s in module.stand(request.app[K_DB], request.app[K_ABLAGE]))
+    zugang = _zugang(request.app, "assistent", ("token",)) if aktiv else None
+    if zugang is None:
+        return web.json_response({"fehler": "Das Modul Finanzen ist nicht aktiv."}, status=404)
+    inhalt = await _roh(request, assistent.MAX_AUSZUG)
+    if inhalt is None:
+        return web.json_response({"fehler": "Die Datei ist zu groß (höchstens 5 MB)."}, status=413)
+    if len(inhalt) < 20:
+        return web.json_response({"fehler": "Die Datei ist leer."}, status=400)
+    try:
+        ergebnis = await assistent.auszug_senden(zugang[0], zugang[1]["token"], inhalt)
+    except assistent.AssistentFehler as e:
+        return web.json_response({"fehler": str(e)}, status=502)
+    meintag._merker.clear()
+    return web.json_response({"ok": True, **ergebnis})
+
+
 async def _seite_finanzen(request: web.Request, modul: module.Modul) -> web.Response:
     zugang = _zugang(request.app, "assistent", ("token",))
     daten, fehler = None, ""
@@ -610,13 +661,13 @@ async def aufnahme_senden(request: web.Request) -> web.Response:
     if zugang is None:
         return web.json_response({"fehler": "Das Modul Aufnahme ist nicht aktiv."}, status=404)
     art = request.content_type
-    if not art.startswith("audio/") and not art.startswith("video/"):
-        return web.json_response({"fehler": "Das ist keine Tonaufnahme."}, status=415)
+    if not art.startswith(("audio/", "video/")) and art not in ("image/jpeg", "image/png", "image/webp"):
+        return web.json_response({"fehler": "Das ist weder eine Tonaufnahme noch ein Foto (JPEG, PNG oder WebP)."}, status=415)
     ton = bytearray()
     async for stueck in request.content.iter_chunked(65536):
         ton.extend(stueck)
         if len(ton) > assistent.MAX_AUFNAHME:
-            return web.json_response({"fehler": "Die Aufnahme ist zu lang."}, status=413)
+            return web.json_response({"fehler": "Die Aufnahme ist zu groß."}, status=413)
     try:
         name = await assistent.aufnahme_senden(zugang[0], zugang[1]["token"], bytes(ton), request.headers.get("Content-Type", art),
                                                request.headers.get("X-Aufnahme-Zeit", ""))
@@ -931,6 +982,8 @@ def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, er
         web.get("/api/erkundung", api_erkundung),
         web.get("/api/tag", api_tag),
         web.post(BRIEFKASTEN, briefkasten),
+        web.post(YAMTRACK_WEG, api_yamtrack),
+        web.post("/m/finanzen/import", finanzen_import),
         web.get("/api/dokumente", api_dokumente),
         web.get("/api/dokumente/suche", api_dokumente_suche),
         web.get("/m/dokumente/pdf/{nr:\\d+}", dokument_datei),

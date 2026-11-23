@@ -58,6 +58,7 @@ Eine Sicherung von Homie ist eine Sicherung dieses Volumes. Wer das Volume samt 
 
 - **homie** – das Dashboard. Läuft im Netz des Rechners (`network_mode: host`), damit die spätere Erkundung Geräte im Heimnetz sehen kann. Ohne Root-Rechte, Dateisystem nur lesbar, schreibt ausschließlich in den Datenordner.
 - **docker-lesen** – ein Zwischendienst, der Homie einen *nur lesenden* Blick auf Docker gibt (welche Container laufen). Homie bekommt den Docker-Zugang nie direkt, und der Zwischendienst ist nur auf dem Rechner selbst erreichbar. Abschalten mit `HOMIE_DOCKER_LESEN=0`.
+- **yamtrack-helfer** – freiwillig und von Haus aus abgeschaltet (`HOMIE_YAMTRACK_SCHREIBEN=1` schaltet ihn ein). Trägt Gesehenes aus Sprachnotizen in ein Yamtrack ein, das auf demselben Rechner läuft. Dafür hat dieser eine Helfer den Docker-Zugang – wer den hat, könnte grundsätzlich alles auf dem Rechner. Deshalb ist er von Homie getrennt, nur auf dem Rechner selbst erreichbar, kennt genau zwei Aufträge (Titel suchen, Gesehenes eintragen) und führt nur sein festes Programm im Yamtrack-Container aus. Aufträge nimmt Homie nur vom verbundenen Notiz-Assistenten an (`POST /api/yamtrack`, mit dessen Schlüssel).
 
 Einstellungen sind freiwillig; alle stehen mit Erklärung in [.env.example](.env.example). Auf Docker Desktop (Windows/Mac) funktioniert das Heimnetz des Rechners anders – vorgesehen ist ein Linux-Rechner.
 
@@ -87,6 +88,10 @@ Wer sich von einem KI-Agenten helfen lässt, erzeugt ihm im Onboarding einen eig
 ## Gesundheitsdaten vom Handy
 
 Schickt eine Gesundheits-App auf dem Handy ihre Daten an `…/api/health-webhook`, reicht Homie sie unverändert an den Notiz-Assistenten weiter. Das ist der einzige Weg, der ohne Anmeldung etwas annimmt: Die App unterschreibt ihre Lieferung, der Notiz-Assistent prüft die Unterschrift; Homie kennt das Geheimnis der App nicht und speichert nichts. Ohne Unterschrift, bei mehr als 12 MB oder mehr als 30 Lieferungen je Minute lehnt Homie selbst ab.
+
+## Fotos und Kontoauszüge
+
+Auf der Seite *Aufnahme* lässt sich neben der Sprachnotiz ein Foto aufnehmen oder eine Datei wählen; dieselben Knöpfe stehen auf der Seite *Finanzen*. Ein Foto (Kassenbon, Rechnung, Zettel) geht an den Notiz-Assistenten, der es liest und wie eine Sprachnotiz einordnet. Ein Kontoauszug (Umsatz-Export der Bank als CSV oder Excel) geht in die Finanzauswertung. Homie reicht beides nur durch und behält nichts.
 
 ## Eigene Seiten
 

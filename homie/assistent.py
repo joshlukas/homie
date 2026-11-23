@@ -18,6 +18,7 @@ from .tag import zone
 WOCHENTAGE = ("Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag")
 MONATE = ("Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez")
 MAX_AUFNAHME = 40_000_000
+MAX_AUSZUG = 5_000_000
 
 
 class AssistentFehler(Exception):
@@ -72,9 +73,25 @@ async def aufnahme_senden(basis: str, token: str, ton: bytes, art: str, zeit: st
                 if r.status == 200 and antwort.get("ok"):
                     return str(antwort.get("name", ""))
                 if r.status == 413:
-                    raise AssistentFehler("Die Aufnahme ist leer oder zu lang.")
+                    raise AssistentFehler("Die Aufnahme ist leer oder zu groß.")
                 raise AssistentFehler(str(antwort.get("fehler") or f"Fehler {r.status}")[:200])
     except (aiohttp.ClientError, asyncio.TimeoutError, OSError, ValueError) as e:
+        raise AssistentFehler("Der Notiz-Assistent ist gerade nicht erreichbar.") from e
+
+
+async def auszug_senden(basis: str, token: str, inhalt: bytes) -> dict:
+    """Gibt einen Kontoauszug (CSV oder Excel) an den Assistenten ab. Antwort: Konto, gelesene und neue Zeilen."""
+    try:
+        async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False), timeout=aiohttp.ClientTimeout(total=60)) as s:
+            async with s.post(basis.rstrip("/") + "/api/finanzen/import", data=inhalt, allow_redirects=False,
+                              headers={"Authorization": f"Bearer {token}", "Content-Type": "application/octet-stream"}) as r:
+                antwort = await r.json(content_type=None)
+                if r.status == 200 and antwort.get("ok"):
+                    return {"konto": str(antwort.get("konto", ""))[:80], "zeilen": int(antwort.get("zeilen") or 0), "neu": int(antwort.get("neu") or 0)}
+                if "Format" in str(antwort.get("fehler", "")):
+                    raise AssistentFehler("Das Format der Datei wurde nicht erkannt. Erwartet wird der Umsatz-Export deiner Bank (CSV oder Excel).")
+                raise AssistentFehler(str(antwort.get("fehler") or f"Fehler {r.status}")[:200])
+    except (aiohttp.ClientError, asyncio.TimeoutError, OSError, ValueError, TypeError) as e:
         raise AssistentFehler("Der Notiz-Assistent ist gerade nicht erreichbar.") from e
 
 

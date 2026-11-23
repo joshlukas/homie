@@ -5,6 +5,7 @@ Weitere Befehle (im Container: `docker exec -i homie python -m homie …`):
   einstellung ich NAME               Dein Name, so wie er bei den geteilten Ausgaben steht (für „du schuldest / du bekommst“).
   verbinden NAME FELD [FELD …]       Einen Dienst ohne Browser verbinden. Die Werte der Felder werden zeilenweise
         [--adresse URL]              von der Eingabe gelesen – nie als Argument, damit sie in keiner Befehlsliste stehen.
+  yamtrack-helfer                    Der kleine Helfer, der Gesehenes in Yamtrack einträgt (eigener Dienst in der Stackdatei).
 """
 from __future__ import annotations
 
@@ -79,8 +80,16 @@ def main() -> int:
                                               (sys.argv[2], sys.argv[3][:60]))
         print("Gespeichert.")
         return 0
+    if befehl == "yamtrack-helfer":
+        import os
+
+        from . import yamtrack
+        port = int(os.environ.get("HOMIE_YAMTRACK_PORT", "23751"))
+        print(f"Homie {VERSION} – Yamtrack-Helfer auf 127.0.0.1:{port}, Container „{yamtrack.CONTAINER}“", flush=True)
+        web.run_app(yamtrack.helfer_app(), host="127.0.0.1", port=port, print=None, access_log=None)
+        return 0
     if befehl != "start":
-        print("Unbekannter Befehl. Möglich: start, passwort-zuruecksetzen, verbinden, einstellung", file=sys.stderr)
+        print("Unbekannter Befehl. Möglich: start, passwort-zuruecksetzen, verbinden, einstellung, yamtrack-helfer", file=sys.stderr)
         return 2
     print(f"Homie {VERSION} – Datenordner {einst.daten}, Port {einst.port}", flush=True)
     web.run_app(app_bauen(einst), host=einst.bind, port=einst.port, print=None, access_log=None)

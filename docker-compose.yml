@@ -20,6 +20,8 @@ services:
       HOMIE_DOCKER_LESEN: ${HOMIE_DOCKER_LESEN:-1}
       HOMIE_DOCKER_URL: http://127.0.0.1:${HOMIE_DOCKER_PORT:-23750}
       HOMIE_MASTER_KEY: ${HOMIE_MASTER_KEY:-}
+      HOMIE_YAMTRACK_SCHREIBEN: ${HOMIE_YAMTRACK_SCHREIBEN:-0}
+      HOMIE_YAMTRACK_URL: http://127.0.0.1:${HOMIE_YAMTRACK_PORT:-23751}
       TZ: ${TZ:-Europe/Berlin}
     volumes:
       - homie-daten:/data          # alles Private: Konto, Erkanntes, verschlüsselte Schlüssel
@@ -60,6 +62,33 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     security_opt: ["no-new-privileges:true"]
+    logging: *protokoll
+
+  # Freiwillig (HOMIE_YAMTRACK_SCHREIBEN=1), nur wenn Yamtrack auf demselben Rechner läuft: trägt Gesehenes aus
+  # Sprachnotizen in Yamtrack ein. Dafür braucht dieser Helfer den Docker-Zugang – er, nicht Homie. Er lauscht nur
+  # auf diesem Rechner, kennt genau zwei Aufträge (Titel suchen, Gesehenes eintragen) und führt nur sein festes
+  # Programm im Container HOMIE_YAMTRACK_CONTAINER aus. Wer den Docker-Zugang hat, könnte grundsätzlich alles auf
+  # dem Rechner – deshalb ist der Helfer von Haus aus abgeschaltet.
+  yamtrack-helfer:
+    image: ghcr.io/joshlukas/homie:latest
+    pull_policy: always
+    container_name: homie-yamtrack-helfer
+    restart: unless-stopped
+    deploy:
+      replicas: ${HOMIE_YAMTRACK_SCHREIBEN:-0}
+    command: ["python", "-m", "homie", "yamtrack-helfer"]
+    network_mode: host               # lauscht nur auf 127.0.0.1, siehe homie/__main__.py
+    user: "0:0"                      # der Docker-Zugang gehört root; alle Sonderrechte sind unten entzogen
+    environment:
+      HOMIE_YAMTRACK_PORT: ${HOMIE_YAMTRACK_PORT:-23751}
+      HOMIE_YAMTRACK_CONTAINER: ${HOMIE_YAMTRACK_CONTAINER:-yamtrack}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      disable: true
     logging: *protokoll
 
 volumes:

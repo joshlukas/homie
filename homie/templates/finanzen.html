@@ -1,9 +1,17 @@
 {% extends "basis.html" %}
 {% block titel %}Homie – Finanzen{% endblock %}
+{% block kopf %}<script src="/static/hochladen.js" defer></script>{% endblock %}
 {% block inhalt %}
 <section class="kopf">
   <h1>Finanzen</h1>
   <p class="leiser">Ausgewertet vom Notiz-Assistenten aus deinen Kontoumsätzen. Homie zeigt nur an und speichert nichts davon.</p>
+  <div class="hochladen">
+    <button type="button" data-waehlen="datei">Kontoauszug oder Beleg hochladen</button>
+    <button type="button" class="leise" data-waehlen="foto">Beleg fotografieren</button>
+    <input id="hochladen" type="file" multiple hidden data-meldung="hochladestand" data-csrf="{{ csrf }}" data-neuladen="1">
+  </div>
+  <p id="hochladestand" class="meldung" data-klasse="meldung" role="status" hidden></p>
+  <p class="leiser klein">Kontoauszug: der Umsatz-Export deiner Bank als CSV oder Excel. Ein fotografierter Beleg wird gelesen und wie eine Sprachnotiz eingeordnet.</p>
 </section>
 {% if fehler %}
 <div class="glas leer"><h3>Gerade keine Zahlen</h3><p class="meldung" role="alert">{{ fehler }}</p></div>

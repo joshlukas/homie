@@ -10,10 +10,11 @@ import secrets
 import tempfile
 import unittest
 
+import aiohttp
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
-from homie import erkundung, katalog, meintag, module
+from homie import erkundung, katalog, meintag, module, yamtrack
 from homie.config import laden
 from homie.server import K_ABLAGE, K_DB, K_ERK, app_bauen
 
@@ -171,6 +172,21 @@ async def _nd_aufnahme(request):
     return web.json_response({"ok": True, "name": "Aufnahme_test.webm"})
 
 
+async def _nd_auszug(request):
+    inhalt = await request.read()
+    if not inhalt.startswith(b"Buchung;"):
+        return web.json_response({"ok": False, "fehler": "Format nicht erkannt"}, status=400)
+    return web.json_response({"ok": True, "konto": "Girokonto", "zeilen": 12, "neu": 3, "stand": "2026-03-04"})
+
+
+EINGETRAGEN = []
+
+
+async def _yt_ausfuehren(auftrag):
+    EINGETRAGEN.append(auftrag)
+    return {"ok": True, "verbucht": ["S01E02"], "titel": "Beispielserie"} if auftrag["aktion"] == "verbuchen" else {"kandidaten": []}
+
+
 ENTSCHIEDEN = []
 
 
@@ -218,7 +234,7 @@ def _nd_entscheid(art):
     return f
 
 
-NOTIZDIENST = {"/api/eintraege": _nd(_nd_eintraege), "/api/finanzen": _nd(_nd_finanzen), "POST /api/aufnahme": _nd(_nd_aufnahme),
+NOTIZDIENST = {"/api/eintraege": _nd(_nd_eintraege), "/api/finanzen": _nd(_nd_finanzen), "POST /api/aufnahme": _nd(_nd_aufnahme), "POST /api/finanzen/import": _nd(_nd_auszug),
                "/api/gesundheit": _nd(_nd_gesundheit), "/api/profil": _nd(_nd_profil), "/api/cospend": _nd(_nd_cospend), "/api/claude": _nd(_nd_ki),
                "POST /api/health-webhook": _nd_lieferung,
                **{f"POST /api/{art}/entscheid": _nd(_nd_entscheid(art)) for art in ("finanzen", "training", "profil")}}
@@ -243,8 +259,12 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
             await s.start_server()
             self.server.append(s)
         ha, ollama, hinaus, docker, self.paperless, self.notizdienst = (s.port for s in self.server)
+        self.helfer = TestServer(yamtrack.helfer_app(_yt_ausfuehren), host="127.0.0.1")
+        await self.helfer.start_server()
+        self.server.append(self.helfer)
         self.tmp = tempfile.TemporaryDirectory()
-        einst = laden({"HOMIE_DATA": self.tmp.name, "HOMIE_DOCKER_URL": f"http://127.0.0.1:{docker}"})
+        einst = laden({"HOMIE_DATA": self.tmp.name, "HOMIE_DOCKER_URL": f"http://127.0.0.1:{docker}",
+                       "HOMIE_YAMTRACK_SCHREIBEN": "1", "HOMIE_YAMTRACK_URL": f"http://127.0.0.1:{self.helfer.port}"})
         self.app = app_bauen(einst, erkundung_ziele=["127.0.0.1"], erkundung_ports=(ha, ollama, hinaus, 1))
         self.c = TestClient(TestServer(self.app))
         await self.c.start_server()
@@ -393,6 +413,7 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.c.get("/api/tag")).status, 401)
 
     async def test_notiz_assistent_aufnahme_und_finanzen(self):
+        ABGEGEBEN.clear()
         r = await self.c.post("/dienst/neu", data={"csrf": self.csrf, "adresse": f"127.0.0.1:{self.notizdienst}"}, allow_redirects=False)
         self.assertEqual(r.status, 303)
         d = (await (await self.c.get("/api/dienste")).json())[0]
@@ -568,6 +589,51 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         self.assertTrue({"aufnahme", "finanzen", "assistent", "tag", "gesundheit"} <= self.aktiv())
         self.assertEqual(len([d for d in await (await self.c.get("/api/dienste")).json()]), 2)
 
+
+    async def test_foto_kontoauszug_und_gesehenes_eintragen(self):
+        ABGEGEBEN.clear(); EINGETRAGEN.clear()
+        kopf = {"X-Homie-CSRF": self.csrf}
+        foto = b"\xff\xd8\xff\xe0" + b"0" * 5000
+        yt = lambda ausweis, auftrag: self.c.post("/api/yamtrack", json=auftrag, headers={"Authorization": ausweis} if ausweis else {})
+        buchen = {"aktion": "verbuchen", "art": "serie", "media_id": "123", "folgen": [[1, 2]]}
+        self.assertEqual((await yt(f"Bearer {GUT}", buchen)).status, 401)          # Assistent noch nicht verbunden: niemand darf
+        await self.c.post("/dienst/neu", data={"csrf": self.csrf, "adresse": f"127.0.0.1:{self.notizdienst}"}, allow_redirects=False)
+        await self.c.post("/dienst/1/verbinden", data={"csrf": self.csrf, "token": GUT}, allow_redirects=False)
+        # Foto: geht denselben Weg wie eine Aufnahme; anderes als Ton und Bild wird abgelehnt
+        r = await self.c.post("/m/aufnahme/senden", data=foto, headers={**kopf, "Content-Type": "image/jpeg"})
+        self.assertEqual((r.status, ABGEGEBEN[-1]), (200, ("image/jpeg", len(foto))))
+        self.assertEqual((await self.c.post("/m/aufnahme/senden", data=foto, headers={**kopf, "Content-Type": "image/svg+xml"})).status, 415)
+        self.assertEqual((await self.c.post("/m/aufnahme/senden", data=foto, headers={**kopf, "Content-Type": "application/pdf"})).status, 415)
+        # Kontoauszug: wird durchgereicht, Homie nennt nur Konto und Zahl der Zeilen
+        r = await self.c.post("/m/finanzen/import", data=b"Buchung;Valuta;Betrag\n" + b"x" * 200, headers=kopf)
+        self.assertEqual((r.status, await r.json()), (200, {"ok": True, "konto": "Girokonto", "zeilen": 12, "neu": 3}))
+        r = await self.c.post("/m/finanzen/import", data=b"irgendwas anderes, kein Auszug", headers=kopf)
+        self.assertEqual(r.status, 502)
+        self.assertIn("Format", (await r.json())["fehler"])
+        self.assertEqual((await self.c.post("/m/finanzen/import", data=b"x" * 5_000_001, headers=kopf)).status, 413)
+        self.assertEqual((await self.c.post("/m/finanzen/import", data=b"Buchung;" + b"x" * 200)).status, 403)       # ohne Sicherheitsmarke
+        for seite, erwartet in (("/m/aufnahme", ('data-waehlen="foto"', 'data-waehlen="datei"', "/static/hochladen.js")), ("/m/finanzen", ('data-waehlen="datei"', "Beleg fotografieren"))):
+            text = await (await self.c.get(seite)).text()
+            for e in erwartet:
+                self.assertIn(e, text)
+        # Gesehenes eintragen: nur der Assistent mit seinem Schlüssel, ohne Anmeldung bei Homie; nur die zwei bekannten Aufträge
+        self.c.session.cookie_jar.clear()
+        self.assertEqual((await yt("", buchen)).status, 401)
+        self.assertEqual((await yt("Bearer falsch", buchen)).status, 401)
+        self.assertEqual(EINGETRAGEN, [])
+        r = await yt(f"Bearer {GUT}", {**buchen, "unbekannt": "wird verworfen"})
+        self.assertEqual((r.status, await r.json()), (200, {"ok": True, "verbucht": ["S01E02"], "titel": "Beispielserie"}))
+        self.assertEqual(EINGETRAGEN, [{"aktion": "verbuchen", "art": "serie", "media_id": "123", "folgen": [[1, 2]], "nochmal": False}])
+        for schlecht in ({"aktion": "loeschen"}, {"aktion": "verbuchen", "art": "serie", "media_id": "1; rm", "folgen": [[1, 1]]},
+                         {"aktion": "verbuchen", "art": "serie", "media_id": "5", "folgen": [[1, i] for i in range(1, 14)]}, {"aktion": "kandidaten", "titel": " "}, [1]):
+            self.assertFalse((await (await yt(f"Bearer {GUT}", schlecht)).json())["ok"])
+        self.assertEqual(len(EINGETRAGEN), 1)
+        self.assertEqual((await self.c.get("/api/yamtrack", allow_redirects=False)).status, 401)                    # lesen gibt es dort nicht
+        self.assertEqual((await self.c.get("/api/tag", headers={"Authorization": f"Bearer {GUT}"})).status, 401)   # der Schlüssel öffnet sonst nichts
+        # der Helfer selbst nimmt ebenfalls nur Geprüftes an
+        async with aiohttp.ClientSession() as direkt:
+            async with direkt.post(f"http://127.0.0.1:{self.helfer.port}/auftrag", json={"aktion": "sonstwas"}) as r:
+                self.assertEqual(r.status, 400)
 
     async def test_briefkasten_fuer_die_gesundheits_app(self):
         GELIEFERT.clear()

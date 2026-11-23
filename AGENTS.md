@@ -32,7 +32,7 @@ Ein vorgeschlagener Plan ist ein Entwurf. Lesen, bestätigen und ausführen kann
 
 - Homie bleibt im Heimnetz. Keine Portfreigaben, keine Tunnel, keine Cloud-Dienste ohne ausdrücklichen Auftrag.
 - Bestehende Dienste im Netz werden nur gelesen. Anlegen, Ändern oder Löschen von VMs, Containern und Daten nur nach bestätigtem Plan.
-- Der Docker-Zugriff bleibt lesend und über den Zwischendienst `docker-lesen`. Den Docker-Socket nicht direkt in `homie` einhängen.
+- Homies Docker-Zugriff bleibt lesend und über den Zwischendienst `docker-lesen`. Den Docker-Socket nicht direkt in `homie` einhängen. Die einzige schreibende Stelle ist der abschaltbare Dienst `yamtrack-helfer` (von Haus aus aus): Er führt nur sein festes Programm im Yamtrack-Container aus – nicht um weitere Aufträge erweitern.
 
 ## Aufbau des Programms
 
@@ -47,8 +47,9 @@ Ein vorgeschlagener Plan ist ein Entwurf. Lesen, bestätigen und ausführen kann
 | `homie/verbinden.py` | Schlüssel beim Dienst prüfen, bevor er abgelegt wird |
 | `homie/meintag.py` | trägt für „Mein Tag“ alles in einer Antwort zusammen (`/api/tag`); die Seite dazu ist `static/mein-tag.js` |
 | `homie/gesundheit.py`, `homie/tag.py` | Modul Gesundheit: liest Home Assistant; `tag.py` liefert nur die Zeitzone |
-| `homie/assistent.py` | Module Aufnahme, Finanzen, Assistent: lesen den Notiz-Assistenten; geben neue Aufnahmen und Entscheidungen zu Vorschlägen an ihn weiter |
+| `homie/assistent.py` | Module Aufnahme, Finanzen, Assistent: lesen den Notiz-Assistenten; geben neue Aufnahmen, Fotos, Kontoauszüge und Entscheidungen zu Vorschlägen an ihn weiter (`static/hochladen.js`) |
 | `homie/dokumente.py` | Modul Dokumente: liest Paperless-ngx (nur lesend, nichts wird gespeichert); die Seite dazu ist `static/dokumente.js` |
+| `homie/yamtrack.py` | Gesehenes in Yamtrack eintragen: Prüfung der Aufträge und der kleine Helfer mit Docker-Zugang (`python -m homie yamtrack-helfer`) |
 | `homie/proxmox.py` | Proxmox lesen (VMs, Container, Speicher) |
 | `homie/plaene.py` | Pläne entwerfen und prüfen; enthält bewusst keinen schreibenden Aufruf |
 | `homie/ausfuehren.py` | einzige Stelle, die an Proxmox schreibt: legt nach Bestätigung genau eine neue VM an, löscht nie |
@@ -59,4 +60,4 @@ Ein vorgeschlagener Plan ist ein Entwurf. Lesen, bestätigen und ausführen kann
 
 Das Menüband ist für alle Seiten dasselbe: Vorlage `templates/_menue.html`, Aussehen `static/menue.css` (wird überall zuletzt geladen). Neue Seiten binden beides ein.
 
-Neue Seiten und API-Wege sind automatisch geschützt. Öffentlich sind nur die in `OEFFENTLICH` genannten Wege und der Briefkasten `POST /api/health-webhook` (nimmt nur unterschriebene Lieferungen an und reicht sie weiter) – diese Liste nicht erweitern.
+Neue Seiten und API-Wege sind automatisch geschützt. Öffentlich sind nur die in `OEFFENTLICH` genannten Wege, der Briefkasten `POST /api/health-webhook` (nimmt nur unterschriebene Lieferungen an und reicht sie weiter) und `POST /api/yamtrack` (nur mit dem Schlüssel des verbundenen Notiz-Assistenten, nur bei eingeschaltetem Helfer) – diese Liste nicht erweitern.

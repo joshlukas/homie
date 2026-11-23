@@ -27,3 +27,11 @@ footer{width:100%;max-width:520px;display:flex;flex-direction:column;gap:8px;ali
 #nachsenden { background: var(--surface); border-color: var(--border-strong); cursor: pointer; }
 body.aufnahmeseite > header, body.aufnahmeseite > main, body.aufnahmeseite > footer { margin-left: auto; margin-right: auto; padding-left: 0; padding-right: 0; }
 body.aufnahmeseite > header { padding-top: 0; padding-bottom: 0; }
+
+/* Foto und Datei unter dem Aufnahmeknopf */
+.dazu { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.dazu button { background: var(--surface); border: 1px solid var(--border-strong); color: var(--text); border-radius: 999px; padding: 11px 20px;
+  font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.dazu button:hover, .dazu button:focus-visible { border-color: var(--accent); }
+.fotolage { text-align: center; color: var(--faint); font-size: 13.5px; max-width: 40ch; min-height: 40px; }
+.fotolage.gut { color: var(--good); } .fotolage.schlecht { color: var(--bad); }

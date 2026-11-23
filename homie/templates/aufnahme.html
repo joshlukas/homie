@@ -13,15 +13,22 @@
 <link rel="stylesheet" href="/static/menue.css">
 <script src="/static/menue.js" defer></script>
 <script src="/static/aufnahme.js" defer></script>
+<script src="/static/hochladen.js" defer></script>
 </head>
 <body class="aufnahmeseite" data-csrf="{{ csrf }}">
 {% include "_menue.html" %}
 
-<header><span>Sprachnotiz</span></header>
+<header><span>Sprachnotiz oder Foto</span></header>
 <main>
   <div id="zeit" aria-live="off">0:00</div>
   <button id="knopf" type="button">Aufnehmen</button>
   <div id="lage" role="status">Tippen startet die Aufnahme.</div>
+  <div class="dazu">
+    <button type="button" data-waehlen="foto">Foto aufnehmen</button>
+    <button type="button" data-waehlen="datei">Datei wählen</button>
+    <input id="hochladen" type="file" multiple hidden data-meldung="fotolage">
+  </div>
+  <div id="fotolage" role="status" data-klasse="fotolage" class="fotolage">Kassenbon, Rechnung oder Zettel fotografieren – der Assistent liest das Foto und trägt es ein. Kontoauszüge (CSV, Excel) gehen an die Finanzen.</div>
 </main>
 <footer>
   <div id="wartend" hidden></div>
