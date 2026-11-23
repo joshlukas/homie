@@ -13,6 +13,7 @@ streng und führt ausschließlich das feste Programm unten im Container mit dem 
 from __future__ import annotations
 
 import asyncio
+import datetime as dt
 import json
 import os
 
@@ -33,6 +34,15 @@ from app.providers import tmdb
 from integrations.webhooks.jellyfin import JellyfinWebhookProcessor
 
 A = json.loads(os.environ["YT_AUFTRAG"])
+
+def gesehen_am():
+    """Der Tag, den der Auftrag nennt, als Zeitpunkt (20 Uhr Ortszeit) – oder None: dann gilt der Augenblick des Eintragens."""
+    if not A.get("datum"):
+        return None
+    import datetime
+    from django.utils import timezone
+    j, m, t = (int(x) for x in A["datum"].split("-"))
+    return timezone.make_aware(datetime.datetime(j, m, t, 20, 0))
 user = get_user_model().objects.order_by("id").first()
 norm = lambda s: re.sub(r"[^a-z0-9äöüß ]", " ", (s or "").lower()).split()
 
@@ -103,7 +113,9 @@ def verbuchen():
             return {"ok": True, "verbucht": [], "titel": vorher.item.title, "hinweis": "war schon als gesehen eingetragen"}
         p._handle_movie(mid, gespielt, user)
         m = models.Movie.objects.filter(user=user, item__media_id=mid, item__source=Sources.TMDB.value).order_by("-created_at").first()
-        return {"ok": True, "verbucht": ["Film"], "titel": m.item.title}
+        if gesehen_am():
+            models.Movie.objects.filter(pk=m.pk).update(end_date=gesehen_am())
+        return {"ok": True, "verbucht": ["Film"], "titel": m.item.title, "datum": A.get("datum") or ""}
     neu, schon = [], []
     for s, e in A["folgen"][:12]:
         da = models.Episode.objects.filter(related_season__user=user, item__media_id=mid, item__source=Sources.TMDB.value,
@@ -112,9 +124,12 @@ def verbuchen():
             schon.append(f"S{s:02d}E{e:02d}")
             continue
         p._handle_tv_episode(mid, int(s), int(e), gespielt, user)
+        if gesehen_am():
+            models.Episode.objects.filter(related_season__user=user, item__media_id=mid, item__source=Sources.TMDB.value,
+                                          item__season_number=s, item__episode_number=e).update(end_date=gesehen_am())
         neu.append(f"S{s:02d}E{e:02d}")
     t = models.Item.objects.filter(media_id=mid, source=Sources.TMDB.value, media_type=MediaTypes.TV.value).first()
-    return {"ok": True, "verbucht": neu, "schon_da": schon, "titel": t.title if t else ""}
+    return {"ok": True, "verbucht": neu, "schon_da": schon, "titel": t.title if t else "", "datum": A.get("datum") or ""}
 
 try:
     erg = {"kandidaten": kandidaten, "verbuchen": verbuchen}[A["aktion"]]()
@@ -140,7 +155,13 @@ def pruefen(a) -> tuple[dict | None, str]:
                 return None, "keine oder zu viele Folgen"
             if any(not (0 <= s <= 200 and 0 < e <= 5000) for s, e in folgen):
                 return None, "Staffel oder Folge außerhalb des Möglichen"
-            return {"aktion": "verbuchen", "art": a["art"], "media_id": str(a["media_id"]), "folgen": folgen, "nochmal": bool(a.get("nochmal"))}, ""
+            sauber = {"aktion": "verbuchen", "art": a["art"], "media_id": str(a["media_id"]), "folgen": folgen, "nochmal": bool(a.get("nochmal"))}
+            if a.get("datum"):      # freiwillig: der Tag, an dem es gesehen wurde – nie in der Zukunft
+                tag = dt.date.fromisoformat(str(a["datum"]))
+                if not dt.date(2000, 1, 1) <= tag <= dt.date.today() or str(a["datum"]) != tag.isoformat():
+                    return None, "Datum außerhalb des Möglichen"
+                sauber["datum"] = tag.isoformat()
+            return sauber, ""
     except (TypeError, ValueError):
         return None, "Auftrag nicht lesbar"
     return None, "unbekannte Aktion"

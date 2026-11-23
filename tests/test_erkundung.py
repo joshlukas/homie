@@ -628,6 +628,12 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
                          {"aktion": "verbuchen", "art": "serie", "media_id": "5", "folgen": [[1, i] for i in range(1, 14)]}, {"aktion": "kandidaten", "titel": " "}, [1]):
             self.assertFalse((await (await yt(f"Bearer {GUT}", schlecht)).json())["ok"])
         self.assertEqual(len(EINGETRAGEN), 1)
+        # der Tag, an dem etwas gesehen wurde, darf mitkommen – aber nur ein echtes Datum, nie in der Zukunft
+        await yt(f"Bearer {GUT}", {**buchen, "datum": "2026-03-01"})
+        self.assertEqual(EINGETRAGEN[-1]["datum"], "2026-03-01")
+        for falsch in ("morgen", "2999-01-01", "2026-3-1", "2026-03-01'); import os"):
+            self.assertFalse((await (await yt(f"Bearer {GUT}", {**buchen, "datum": falsch})).json())["ok"])
+        self.assertEqual(len(EINGETRAGEN), 2)
         self.assertEqual((await self.c.get("/api/yamtrack", allow_redirects=False)).status, 401)                    # lesen gibt es dort nicht
         self.assertEqual((await self.c.get("/api/tag", headers={"Authorization": f"Bearer {GUT}"})).status, 401)   # der Schlüssel öffnet sonst nichts
         # der Helfer selbst nimmt ebenfalls nur Geprüftes an
