@@ -13,10 +13,10 @@ import datetime as dt
 import aiohttp
 
 from .gesundheit import deutsch
-from .tag import WOCHENTAGE, zone
+from .tag import zone
 
+WOCHENTAGE = ("Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag")
 MONATE = ("Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez")
-ARTEN = {"aufnahme": "Aufnahme", "fuer_claude": "Auftrag"}
 MAX_AUFNAHME = 40_000_000
 
 
@@ -60,24 +60,6 @@ def _datum(tag: str | None) -> str:
 
 def _euro(wert, stellen: int = 2) -> str:
     return "–" if not isinstance(wert, (int, float)) else deutsch(wert, stellen) + " €"
-
-
-async def eintraege(basis: str, token: str, tage: int = 14) -> dict:
-    roh = await _holen(basis, token, f"/api/eintraege?tage={tage}")
-    namen = {**ARTEN, **(roh.get("kategorien") or {})}
-    heute = dt.datetime.now(zone()).date()
-    je_tag: dict[str, list[dict]] = {}
-    for e in roh.get("eintraege", []):
-        daten = e.get("daten") or {}
-        if e.get("typ") == "aufnahme":
-            continue   # die Aufnahme selbst; ihre Inhalte stehen in den eingeordneten Einträgen
-        je_tag.setdefault(e.get("tag", ""), []).append({
-            "zeit": (e.get("zeit") or "")[11:16], "art": namen.get(e.get("typ"), e.get("typ", "")), "typ": e.get("typ", ""),
-            "text": e.get("text", ""), "antwort": daten.get("antwort") or "",
-            "betrag": _euro(daten["betrag_eur"]) if isinstance(daten.get("betrag_eur"), (int, float)) else "",
-        })
-    return {"tage": [{"name": _tag_text(tag, heute), "eintraege": je_tag[tag]} for tag in sorted(je_tag, reverse=True)],
-            "anzahl": sum(len(v) for v in je_tag.values()), "spanne": tage}
 
 
 async def aufnahme_senden(basis: str, token: str, ton: bytes, art: str, zeit: str) -> str:

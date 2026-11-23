@@ -3,7 +3,6 @@
 Aufruf im Projektordner:  python -m unittest discover -s tests -v
 """
 import secrets
-import sqlite3
 import tempfile
 import unittest
 from pathlib import Path

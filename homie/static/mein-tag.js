@@ -159,9 +159,10 @@ function render(d) {
   const g = d.gesundheit;
   let health = "";
   if (g) {
-    const a = g.aktuell, stat = (k, label, f) => (a[k] ? `<div class="hstat"><b>${f(a[k].wert)}</b><span>${label}</span></div>` : "");
+    const a = g.aktuell, alt = (k) => (a[k].stand && new Date(a[k].stand).toLocaleDateString("sv-SE") !== t0 ? " · " + fmtDay(new Date(a[k].stand).toLocaleDateString("sv-SE")) : ""),
+      stat = (k, label, f, mitTag) => (a[k] ? `<div class="hstat"><b>${f(a[k].wert)}</b><span>${label}${mitTag ? alt(k) : ""}</span></div>` : "");
     const maxS = Math.max(1, ...g.tage.map((x) => x.schritte || 0));
-    health = `<div class="hstats">${stat("schritte", "Schritte heute", (v) => nf(v))}${stat("distanz_m", "km heute", (v) => nf(v / 1000, 1))}${stat("kalorien_aktiv", "kcal aktiv", (v) => nf(v))}${stat("puls", "Puls", (v) => nf(v))}${stat("ruhepuls", "Ruhepuls", (v) => nf(v))}${stat("sauerstoff", "% Sauerstoff", (v) => nf(v))}</div>`
+    health = `<div class="hstats">${stat("schritte", "Schritte heute", (v) => nf(v))}${stat("distanz_m", "km heute", (v) => nf(v / 1000, 1))}${stat("kalorien_aktiv", "kcal aktiv", (v) => nf(v))}${stat("puls", "Puls", (v) => nf(v), true)}${stat("ruhepuls", "Ruhepuls", (v) => nf(v), true)}${stat("sauerstoff", "% Sauerstoff", (v) => nf(v), true)}</div>`
       + `<div class="barwrap"><div class="bars good" role="img" aria-label="Schritte pro Tag">${g.tage.map((x, i) =>
         `<div style="height:${Math.round(100 * (x.schritte || 0) / maxS)}%" title="${fmtDay(x.tag)}: ${nf(x.schritte || 0)} Schritte${x.distanz_m ? ", " + nf(x.distanz_m / 1000, 1) + " km" : ""}">${lab(x, i, g.tage.length)}</div>`).join("")}</div></div>`
       + `<p class="avg">Schnitt ${nf(g.tage.reduce((s, x) => s + (x.schritte || 0), 0) / Math.max(1, g.tage.filter((x) => x.schritte).length))} Schritte an ${g.tage.filter((x) => x.schritte).length} Tagen mit Daten</p>`;
@@ -232,8 +233,14 @@ function render(d) {
   }
   const GG = d.gesundheit;
   if (GG) {
-    const vor7 = new Date(Date.now() - 7 * 864e5).toISOString(), tr = (GG.training || []).filter((x) => x.beginn >= vor7);
-    kachel("Training in 7 Tagen", tr.length + " von 3", tr.length ? tr.reduce((x, y) => x + (y.dauer_min || 0), 0) + " Minuten · zuletzt " + fmtDay(tr[0].beginn.slice(0, 10)) : "noch keines · Ziel sind drei pro Woche", tr.length >= 3 ? "var(--good)" : tr.length ? "var(--warn)" : "var(--bad)", "Körper und Essen");
+    // Kalenderwoche von Montag bis Sonntag – unabhängig vom oben gewählten Zeitraum
+    const mo = new Date(); mo.setDate(mo.getDate() - ((mo.getDay() + 6) % 7));
+    const moIso = mo.toLocaleDateString("sv-SE"), wtag = (new Date().getDay() + 6) % 7, rest = 6 - wtag;
+    const trAlle = (GG.training_alle && GG.training_alle.length ? GG.training_alle : GG.training || []).slice().sort((x, y) => y.tag.localeCompare(x.tag));
+    const tr = trAlle.filter((x) => x.tag >= moIso), fehlt = Math.max(0, 3 - tr.length);
+    const zuletzt = trAlle.length ? "zuletzt " + fmtDay(trAlle[0].tag) : "noch keines eingetragen";
+    kachel("Training diese Woche", tr.length + " von 3", (tr.length ? tr.reduce((x, y) => x + (y.dauer_min || 0), 0) + " Minuten · " : "") + (fehlt ? zuletzt + (rest ? ` · noch ${rest} ${rest === 1 ? "Tag" : "Tage"}` : " · letzter Tag der Woche") : "Wochenziel erreicht"),
+      !fehlt ? "var(--good)" : fehlt > rest + 1 ? "var(--bad)" : tr.length || wtag < 3 ? "var(--warn)" : "var(--bad)", "Körper und Essen");
     const mit = GG.tage.filter((x) => x.schritte), letzte7 = mit.slice(-7), schnitt = letzte7.length ? letzte7.reduce((x, y) => x + y.schritte, 0) / letzte7.length : 0;
     const heuteS = GG.aktuell.schritte ? GG.aktuell.schritte.wert : null;
     if (heuteS != null) {

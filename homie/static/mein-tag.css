@@ -16,9 +16,6 @@ header p{margin:0;color:var(--muted);font-size:13px}
 .seg button[aria-pressed=true]{background:rgba(129,140,248,.2);color:var(--text)}
 main{max-width:1280px;margin:0 auto}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:6px 0 18px}
-.tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
-.tile b{display:block;font-size:26px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
-.tile span{color:var(--muted);font-size:12.5px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px;align-items:start}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;min-width:0}
 .card.wide{grid-column:1/-1}
@@ -110,23 +107,22 @@ body {
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
 }
-.bg { background: none; }
-h1, h2, h3, .tile b, .hstat b, #zeit, .summary strong { font-family: var(--display); }
+h1, h2, h3, .hstat b, #zeit, .summary strong { font-family: var(--display); }
 a { color: #9db4ff; }
 ::selection { background: rgba(139, 124, 255, 0.45); }
 * { scrollbar-color: #33386b transparent; }
 
 /* ---------- Kopfzeilen ---------- */
-header h1, .brand h1 {
+header h1{
   font-size: 26px; font-weight: 700; letter-spacing: -0.02em;
   background: var(--g-brand); -webkit-background-clip: text; background-clip: text; color: transparent;
 }
-body > header a, .doclink {
+body > header a{
   font-size: 13px; font-weight: 500; color: var(--text); text-decoration: none;
   padding: 8px 14px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border);
   box-shadow: var(--shadow); transition: transform 0.15s, border-color 0.15s;
 }
-body > header a:hover, .doclink:hover, .doclink:focus-visible {
+body > header a:hover{
   text-decoration: none; border-color: rgba(139, 124, 255, 0.7); transform: translateY(-1px);
 }
 .logo { background: var(--g-brand); color: #fff; box-shadow: 0 12px 28px -10px rgba(192, 92, 255, 0.8); }
@@ -136,22 +132,10 @@ body > header a:hover, .doclink:hover, .doclink:focus-visible {
 .seg { border: 0; background: var(--surface-strong); padding: 4px; gap: 2px; box-shadow: var(--shadow); }
 .seg button { border-radius: 999px; padding: 7px 14px; font-weight: 500; transition: color 0.15s; }
 .seg button:hover { color: var(--text); }
-.seg button[aria-pressed="true"] { background: var(--g-violet); color: #fff; box-shadow: 0 8px 18px -8px rgba(106, 92, 255, 0.9); }
-
-/* ---------- Flächen ---------- */
-.panel, .card, .tile, .drawer {
+.seg button[aria-pressed="true"] { background: var(--g-violet); color: #fff; box-shadow: 0 8px 18px -8px rgba(106, 92, 255, 0.9); } .card{
   background: linear-gradient(180deg, var(--surface-2) -40%, var(--surface) 38%);
   border: 1px solid var(--border); box-shadow: var(--shadow); backdrop-filter: none;
 }
-.drawer { background: var(--surface-strong); }
-
-/* Kennzahlen oben: abwechselnd in den drei Verläufen */
-.tile { position: relative; overflow: hidden; padding: 16px 18px; border: 0; }
-.tile::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 4px; background: var(--g-violet); }
-.tile:nth-child(3n + 2)::before { background: var(--g-pink); }
-.tile:nth-child(3n)::before { background: var(--g-teal); }
-.tile b { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; }
-.tile span { color: var(--muted); }
 
 /* Karten: farbige Kante oben in der Farbe der Karte, Titel ruhig */
 .card { position: relative; overflow: hidden; padding: 20px 20px 16px; }
@@ -227,16 +211,11 @@ details.mehr summary { margin: 0; }
 
 /* ---------- Finanzen ---------- */
 .held { padding: 22px 22px 16px; }
-.heldkopf { display: flex; flex-wrap: wrap; gap: 16px 26px; align-items: center; }
-.heldkopf > svg { flex: none; }
-.heldzahl { flex: 1 1 230px; min-width: 0; }
 .gross { display: block; font: 700 clamp(38px, 7vw, 56px)/1.05 var(--display); letter-spacing: -0.03em; margin: 6px 0;
   background: var(--g-brand); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .gross.minus { background: none; color: var(--bad); }
 .klein { display: block; color: var(--muted); font-size: 13.5px; }
 .punkt { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 0 4px rgba(150, 160, 255, 0.12); }
-.ringzahl { font: 600 22px var(--display); fill: var(--text); }
-.ringtext { font: 600 8.5px var(--body); fill: var(--faint); letter-spacing: 0.1em; text-transform: uppercase; }
 .minis { flex: 2 1 320px; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; min-width: 0; }
 .mini { background: var(--surface-strong); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
 .mini b { display: block; font: 600 22px/1.15 var(--display); font-variant-numeric: tabular-nums; }
@@ -245,13 +224,8 @@ details.mehr summary { margin: 0; }
 .mini span { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; margin-top: 4px; }
 .chart { margin: 18px 0 4px; }
 .chart svg { display: block; width: 100%; height: auto; }
-.gitter { stroke: rgba(150, 160, 255, 0.09); stroke-width: 1; }
 .grenze { stroke: var(--warn); stroke-width: 1.2; stroke-dasharray: 5 5; opacity: 0.8; }
 .ueblich { fill: none; stroke: var(--faint); stroke-width: 2; stroke-dasharray: 2 5; stroke-linecap: round; }
-.prog { fill: none; stroke: #ff8a6b; stroke-width: 2.5; stroke-dasharray: 6 6; stroke-linecap: round; }
-.progpunkt { fill: var(--surface); stroke: #ff8a6b; stroke-width: 2.5; }
-.achse { font: 500 11px var(--body); fill: var(--faint); }
-.achse.hell { fill: var(--muted); }
 .legende { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 12px; color: var(--muted); }
 .legende i { display: inline-block; width: 16px; height: 6px; border-radius: 3px; margin-right: 7px; vertical-align: 1px; }
 .legende i.strich { background: repeating-linear-gradient(90deg, #ff8a6b 0 5px, transparent 5px 9px); height: 3px; }
@@ -286,14 +260,9 @@ details.mehr summary { margin: 0; }
 .katwert { text-align: right; white-space: nowrap; }
 .katwert b { display: block; font: 600 14px var(--display); font-variant-numeric: tabular-nums; }
 .katwert small { color: var(--faint); font-size: 11.5px; }
-
-/* ---------- Startseite: Netzplan ---------- */
-.map-wrap { background: var(--surface-strong); padding: 10px; }
 #map { max-height: none; min-width: 860px; }
 .node .box { fill: #23274f; stroke: rgba(150, 160, 255, 0.34); }
-.node:hover .box, .node:focus-visible .box, .node.selected .box { fill: #2e3368; }
-.edge-base { stroke: rgba(150, 160, 255, 0.26); }
-.gpu-badge rect { fill: #251a45; }
+.node:hover .box, .node:focus-visible .box{ fill: #2e3368; }
 
 /* ---------- Aufnahmeknopf ---------- */
 #knopf {
@@ -306,7 +275,6 @@ details.mehr summary { margin: 0; }
 #nachsenden { background: var(--surface); border-color: var(--border-strong); }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
-
 
 /* ================= Abgedunkelt (22.11.2026): fast schwarz, Flächen in feinen Stufen, Akzente sparsam ================= */
 :root {
@@ -326,20 +294,16 @@ body {
     var(--bg);
   background-attachment: fixed;
   padding-top: calc(var(--menue) + env(safe-area-inset-top, 0px) + 12px) !important;
-}
-.panel, .card, .tile, .lage, .drawer { background: linear-gradient(180deg, #161827 0%, var(--surface) 46%); border-color: var(--border); }
-.drawer, .map-wrap, .seg, details.mehr, .mini { background: var(--surface-strong); }
+} .card, .lage{ background: linear-gradient(180deg, #161827 0%, var(--surface) 46%); border-color: var(--border); } .seg, details.mehr, .mini { background: var(--surface-strong); }
 .node .box { fill: #141624; stroke: rgba(255, 255, 255, 0.17); }
-.node:hover .box, .node:focus-visible .box, .node.selected .box { fill: #1e2136; }
-.gpu-badge rect { fill: #1a1430; }
-.edge-base { stroke: rgba(170, 178, 255, 0.24); }
+.node:hover .box, .node:focus-visible .box{ fill: #1e2136; }
 .tag { background: rgba(255, 255, 255, 0.075); color: var(--muted); }
 .antwort { background: rgba(255, 255, 255, 0.035); }
 li { border-top-color: var(--border); font-size: 15px; }
 li small { font-size: 13px; color: var(--faint); }
 .card h2 { font-size: 16.5px; }
 .card h2 em { font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; }
-header p, .brand p { color: var(--muted); font-size: 13.5px; }
+header p{ color: var(--muted); font-size: 13.5px; }
 .gruppe span { background: var(--surface); }
 #knopf { box-shadow: 0 0 0 calc(var(--pegel) * 34px) rgba(255, 95, 162, 0.2), 0 34px 70px -24px rgba(192, 92, 255, 0.8), 0 0 0 10px rgba(255, 255, 255, 0.04); }
 
@@ -423,7 +387,6 @@ body > header { padding-top: 8px; }
 .kal li small { font-weight: 400; }
 
 /* Startseite am Handy: erst der Überblick, dann der große Netzplan */
-@media (max-width: 720px) { main > .insights { order: 1; } main > .map-wrap { order: 2; } }
 
 /* Überblickskarten der Startseite werden laufend neu gezeichnet; ohne Einblenden bleiben sie voll lesbar */
 #insights .card { animation: none; opacity: 1; transform: none; }
@@ -447,28 +410,24 @@ body {
     radial-gradient(50% 46% at 12% 100%, rgba(91, 157, 255, 0.22), transparent 72%),
     linear-gradient(160deg, #14173a 0%, #101329 48%, #131230 100%);
   background-attachment: fixed;
-}
-.panel, .card, .tile, .lage, .map-wrap, details.mehr {
+} .card, .lage, details.mehr {
   background: var(--glas); border-color: var(--glas-kante); box-shadow: var(--shadow);
   -webkit-backdrop-filter: var(--unscharf); backdrop-filter: var(--unscharf);
 }
 details.mehr { background: linear-gradient(155deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)); }
-details.mehr .card, .map-wrap .panel { -webkit-backdrop-filter: none; backdrop-filter: none; }
-.drawer { background: rgba(24, 27, 56, 0.78); border-color: var(--glas-kante); -webkit-backdrop-filter: blur(28px) saturate(170%); backdrop-filter: blur(28px) saturate(170%); }
+details.mehr .card{ -webkit-backdrop-filter: none; backdrop-filter: none; }
 .seg, .mini, .kal li, .kal li:first-child { background: var(--surface-strong); border-color: rgba(255, 255, 255, 0.08); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25) inset; }
 .menue { background: rgba(18, 21, 46, 0.62); -webkit-backdrop-filter: blur(26px) saturate(170%); backdrop-filter: blur(26px) saturate(170%); border-bottom-color: var(--glas-kante); box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 18px 40px -28px rgba(3, 4, 18, 0.9); }
 .menue .tabs { background: rgba(255, 255, 255, 0.07); border-color: rgba(255, 255, 255, 0.12); box-shadow: 0 1px 0 rgba(255, 255, 255, 0.10) inset; }
 .node .box { fill: #23274a; stroke: rgba(255, 255, 255, 0.24); }
-.node:hover .box, .node:focus-visible .box, .node.selected .box { fill: #2e3360; }
-.gpu-badge rect { fill: #2a2050; }
+.node:hover .box, .node:focus-visible .box{ fill: #2e3360; }
 .tag { background: rgba(255, 255, 255, 0.10); }
 .antwort { background: rgba(255, 255, 255, 0.06); }
 .budget { background: rgba(7, 9, 26, 0.4); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3) inset; }
 .gruppe span { background: #171a36; border-radius: 999px; }
 .c-progpunkt { fill: #1b1e3a; }
 .blase text { fill: #101329; }
-@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
-  .panel, .card, .tile, .lage, .map-wrap, details.mehr { background: linear-gradient(155deg, #262a4f, #1a1d39); }
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) { .card, .lage, details.mehr { background: linear-gradient(155deg, #262a4f, #1a1d39); }
   .menue { background: rgba(18, 21, 46, 0.96); }
 }
 .lineal, .rolle { background: var(--glas); border-color: var(--glas-kante); box-shadow: var(--shadow); -webkit-backdrop-filter: var(--unscharf); backdrop-filter: var(--unscharf); }

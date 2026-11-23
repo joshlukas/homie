@@ -15,7 +15,7 @@ import jinja2
 from aiohttp import web
 from yarl import URL
 
-from . import agenten, assistent, ausfuehren, dokumente, gesundheit, katalog, meintag, module, plaene, proxmox, tag, verbinden
+from . import agenten, assistent, ausfuehren, dokumente, gesundheit, katalog, meintag, module, plaene, proxmox, verbinden
 from .ablage import Ablage
 from .anmeldung import COOKIE, MIN_LAENGE, Anmeldung, passwort_maengel
 from .config import PAKET, VERSION, Einstellungen
