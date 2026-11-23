@@ -302,3 +302,15 @@ a.dienst.weg { border-color: rgba(255, 107, 139, 0.55); }
 pre.profil { margin: 4px 0 10px; white-space: pre-wrap; overflow-wrap: anywhere; font: 14.5px/1.55 var(--schrift); color: var(--text); }
 .tagkarte p { overflow-wrap: anywhere; }
 .alt { text-decoration: line-through; }
+
+/* ---------- Blueprint: Bereiche unter einem Menüpunkt ---------- */
+.unterband { display: inline-flex; gap: 2px; padding: 4px; margin: 0 0 16px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--glas-kante); max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.unterband::-webkit-scrollbar { display: none; }
+.unterband a { flex: none; padding: 7px 16px; border-radius: 999px; color: var(--muted); font-size: 13.5px; font-weight: 600; text-decoration: none; }
+.unterband a:hover { color: var(--text); }
+.unterband a[aria-current="page"] { background: var(--g-violet); color: #fff; box-shadow: 0 8px 18px -8px rgba(106, 92, 255, 0.9); }
+body.voll { height: 100dvh; overflow: hidden; }
+body.voll main { max-width: none; padding: 0; display: flex; flex-direction: column; min-height: 0; }
+body.voll .unterband { align-self: flex-start; margin: 0 16px 10px; }
+body.voll footer { display: none; }
+iframe.plan { flex: 1; min-height: 0; width: 100%; border: 0; background: var(--bg); }

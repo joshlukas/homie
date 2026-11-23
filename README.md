@@ -9,8 +9,7 @@ Ein Dashboard fürs Heimnetz, das sich selbst aufbaut: Homie erkundet dein Netz 
 - **Dokumente** – der Dokumentstream für Paperless-ngx: ein Dokument je Bildschirm mit Zeitachse, Raster nach Monaten, Suche in Titel und Volltext, Filter nach Jahr, Art, Absender und Schlagwort, Leser für das ganze PDF, Herunterladen; alles auch per Tastatur
 - **Aufnahme** – der große Aufnahmeknopf: nimmt auf, sichert alle paar Sekunden im Gerät und sendet nach, sobald Homie wieder erreichbar ist
 - **Finanzen** – Spielraum im Monat, Konten, Einnahmen und Ausgaben, kommende Posten, geteilte Ausgaben
-- **Assistent** – Profil, das der Notiz-Assistent pflegt, und Kosten der KI-Hilfe von außen
-- **Übersicht** – Startseite: alle Dienste mit ihrem Zustand in diesem Augenblick
+- **Blueprint** – dein Heimnetz an einem Ort, mit den Bereichen *Plan* (eine eigene, handgeschriebene Seite), *Dienste* (Zustand aller Dienste in diesem Augenblick), *Netz* (Geräte, Dienste, virtuelle Maschinen, Container) und *Assistent* (Profil und Kosten der KI-Hilfe)
 
 *Aufnahme* und *Finanzen* setzen einen eigenen Dienst voraus (den „Notiz-Assistenten“, der Sprachnotizen mit lokaler KI verschriftlicht und Kontoumsätze auswertet); er gehört noch nicht zu Homie. Alle Module lesen nur und speichern keine Inhalte. Zwei Ausnahmen, beide nur auf deinen Klick: Eine neue Sprachaufnahme wird an den Notiz-Assistenten abgegeben, und wenn du einen seiner Vorschläge annimmst oder ablehnst (Training, geteilte Ausgabe, Profil), gibt Homie diese Entscheidung an ihn weiter. Der Aufnahmeknopf braucht eine https-Adresse, weil Browser das Mikrofon sonst nicht freigeben.
 
@@ -91,7 +90,7 @@ Schickt eine Gesundheits-App auf dem Handy ihre Daten an `…/api/health-webhook
 
 ## Eigene Seiten
 
-HTML-Dateien im Ordner `seiten` des Datenordners erscheinen als zusätzliche Tabs – zum Beispiel ein selbst geschriebener Plan deines Heimnetzes als `seiten/blueprint.html`. Solche Seiten laufen abgeschottet: Skripte dürfen laufen, kommen aber nicht an Homies Anmeldung oder Schnittstellen und laden nichts aus dem Internet nach (außer Bildern).
+Liegt im Ordner `seiten` des Datenordners eine Datei `blueprint.html`, erscheint sie als Bereich *Plan* unter *Blueprint*: als Standbild ohne Skripte, mit Homies Menüband darüber. Weitere HTML-Dateien dort erscheinen als zusätzliche Tabs. Solche Seiten laufen abgeschottet: Skripte dürfen laufen, kommen aber nicht an Homies Anmeldung oder Schnittstellen und laden nichts aus dem Internet nach (außer Bildern).
 
 ## Module
 

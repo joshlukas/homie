@@ -140,7 +140,7 @@ class Plaene(unittest.IsolatedAsyncioTestCase):
         return r
 
     async def test_netzplan_zeigt_vms(self):
-        r = await self.c.get("/m/netzplan")
+        r = await self.c.get("/blueprint/netz")
         text = await r.text()
         self.assertEqual(r.status, 200)
         for erwartet in ("Virtuelle Maschinen", "knoten1", "10 von 64 GB Arbeitsspeicher frei", "medien", "VM 100", "werbefilter", "Container 101"):
@@ -270,7 +270,7 @@ class Plaene(unittest.IsolatedAsyncioTestCase):
         # alles andere bleibt dem Agenten verschlossen – vor allem das Bestätigen
         for pfad in ("/api/dienste", "/api/netzplan"):
             self.assertEqual((await self.c.get(pfad, headers=kopf)).status, 401, pfad)
-        for pfad in ("/onboarding", "/plan/1", "/m/netzplan"):
+        for pfad in ("/onboarding", "/plan/1", "/blueprint/netz"):
             self.assertEqual((await self.c.get(pfad, headers=kopf, allow_redirects=False)).status, 303, pfad)
         for pfad in ("/plan/1/bestaetigen", "/plan/1/verwerfen", "/dienst/1/trennen", "/erkundung/start", "/helfer/neu", "/agent/plaene/1/bestaetigen"):
             r = await self.c.post(pfad, headers=kopf, data={"csrf": self.csrf, "gelesen": "ja"}, allow_redirects=False)

@@ -26,12 +26,14 @@ class Modul:
     titel: str
     beschreibung: str
     braucht: tuple[Bedarf, ...] = ()
-    kern: bool = False             # Kern-Module sind immer da (Onboarding)
+    kern: bool = False             # Kern-Module sind immer da (Blueprint, Onboarding)
     farbe: str = "#8b7cff"
+    menue: bool = True             # False: kein eigener Menüpunkt – die Seite gehört zu einem anderen (siehe ziel)
+    ziel: str = ""                 # abweichende Adresse der Seite
 
     @property
     def pfad(self) -> str:
-        return f"/{self.id}" if self.kern else f"/m/{self.id}"
+        return self.ziel or (f"/{self.id}" if self.kern else f"/m/{self.id}")
 
 
 @dataclass
@@ -50,7 +52,6 @@ class ModulStand:
 
 
 MODULE: tuple[Modul, ...] = (
-    Modul("uebersicht", "Übersicht", "Alle verbundenen und gefundenen Dienste mit ihrem Zustand.", kern=True),
     Modul(
         "tag", "Mein Tag", "Termine, Aufgaben und das Wichtigste für heute.",
         (Bedarf("homeassistant", "Home Assistant (kennt Kalender, Aufgaben und Wetter)", ("token",)),), farbe="#ff5fa2",
@@ -74,11 +75,14 @@ MODULE: tuple[Modul, ...] = (
     Modul(
         "netzplan", "Netzplan", "Alle Geräte und Dienste im Heimnetz als Plan.",
         (Bedarf("*", "mindestens ein gefundenes Gerät (nach der ersten Erkundung)", zustand="gefunden"),), farbe="#c77dff",
+        menue=False, ziel="/blueprint/netz",
     ),
     Modul(
         "assistent", "Assistent", "Was der Notiz-Assistent über dich gelernt hat und was die KI kostet.",
         (Bedarf("assistent", "ein Notiz-Assistent (eigener Dienst)", ("token",)),), farbe="#a36bff",
+        menue=False, ziel="/blueprint/assistent",
     ),
+    Modul("blueprint", "Blueprint", "Dein Heimnetz an einem Ort: eigener Plan, Zustand der Dienste, Netzplan und Assistent.", kern=True),
     Modul("onboarding", "Onboarding", "Dienste finden, verbinden und Module freischalten.", kern=True),
 )
 

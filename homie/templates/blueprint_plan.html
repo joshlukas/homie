@@ -1,0 +1,7 @@
+{% extends "basis.html" %}
+{% block titel %}Homie – Blueprint{% endblock %}
+{% block koerper %}voll{% endblock %}
+{% block inhalt %}
+{% include "_blueprint_tabs.html" %}
+<iframe class="plan" src="/blueprint/plan/inhalt?marke={{ marke }}" title="Dein Plan" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe>
+{% endblock %}

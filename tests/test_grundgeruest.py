@@ -89,7 +89,7 @@ class Web(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.c.get("/m/tag")).status, 404)
         self.assertIn("Beispielansicht", await (await self.c.get("/onboarding?beispiel=1")).text())
         z = await (await self.c.get("/api/zustand")).json()
-        self.assertEqual(z["module_aktiv"], ["uebersicht", "onboarding"])
+        self.assertEqual(z["module_aktiv"], ["blueprint", "onboarding"])
         self.assertEqual(z["erkundung"], {"docker": "aus"})
         # ein Menüband für alle Seiten: gleiche Vorlage, gleiches Aussehen, zuletzt geladen
         self.assertIn('<nav class="menue" aria-label="Hauptmenü"><a class="marke" href="/"><i></i><span>Homie</span></a>', text)
@@ -105,7 +105,7 @@ class Web(unittest.IsolatedAsyncioTestCase):
             r = await self.c.get(f"/static/schrift/{datei}")
             self.assertEqual((r.status, (await r.read())[:4]), (200, b"wOF2"))
         # frühere Adressen (Lesezeichen, App-Symbol) führen zur heutigen Seite – auch sie nur mit Anmeldung
-        for alt, neu in (("/aufnahme", "/m/aufnahme"), ("/dokumente/", "/m/dokumente"), ("/blueprint", "/s/blueprint"), ("/mein-tag", "/m/tag")):
+        for alt, neu in (("/aufnahme", "/m/aufnahme"), ("/dokumente/", "/m/dokumente"), ("/blueprint.html", "/blueprint"), ("/mein-tag", "/m/tag")):
             r = await self.c.get(alt, allow_redirects=False)
             self.assertEqual((r.status, r.headers["Location"]), (303, neu), alt)
         # Abmelden ohne Sicherheitsmarke wird abgelehnt, mit Marke klappt es
@@ -136,7 +136,7 @@ class Web(unittest.IsolatedAsyncioTestCase):
         db, ablage = self.app[K_DB], self.app[K_ABLAGE]
         db.ausfuehren("INSERT INTO dienst (art, name, zustand, gefunden) VALUES ('dokumente','Archiv','gefunden',0)")
         aktiv = lambda: {s.modul.id for s in module.stand(db, ablage) if s.aktiv}
-        self.assertEqual(aktiv(), {"uebersicht", "onboarding", "netzplan"})       # Netzplan braucht nur einen gefundenen Dienst
+        self.assertEqual(aktiv(), {"blueprint", "onboarding", "netzplan"})       # Netzplan braucht nur einen gefundenen Dienst
         db.ausfuehren("UPDATE dienst SET zustand='verbunden'")
         self.assertNotIn("dokumente", aktiv())                       # verbunden, aber Schlüssel fehlt
         ablage.setzen(module.schluesselname(1, "token"), "geheim-123")

@@ -1,0 +1,3 @@
+<nav class="unterband" aria-label="Bereiche im Blueprint">
+  {% for t in bp_tabs %}<a href="{{ t.pfad }}"{% if pfad == t.pfad %} aria-current="page"{% endif %}>{{ t.titel }}</a>{% endfor %}
+</nav>

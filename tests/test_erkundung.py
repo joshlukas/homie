@@ -282,7 +282,7 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
             self.assertIn(erwartet, text)
         # Netzplan ist jetzt freigeschaltet und zeigt Gerät, Dienste und Container
         self.assertIn("netzplan", self.aktiv())
-        plan = await (await self.c.get("/m/netzplan")).text()
+        plan = await (await self.c.get("/blueprint/netz")).text()
         for erwartet in ("127.0.0.1", "Home Assistant", "Ollama", "archiv", "2 Container"):
             self.assertIn(erwartet, plan)
         self.assertEqual((await self.c.get("/api/netzplan")).status, 200)
@@ -304,7 +304,7 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(r.status, 303)
         self.assertEqual(self.app[K_ABLAGE].lesen(module.schluesselname(ha, "token")), GUT)
         self.assertIn("gesundheit", self.aktiv())
-        for pfad in ("/onboarding", "/api/dienste", "/api/netzplan", "/m/netzplan"):
+        for pfad in ("/onboarding", "/api/dienste", "/api/netzplan", "/blueprint/netz"):
             self.assertNotIn(GUT, await (await self.c.get(pfad)).text(), pfad)
         # Dienst ohne Schlüssel
         r = await self.c.post(f"/dienst/{ollama}/verbinden", data={"csrf": self.csrf}, allow_redirects=False)
@@ -328,7 +328,7 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         for pfad in ("/erkundung/start", "/dienst/1/verbinden", "/dienst/1/trennen"):
             r = await self.c.post(pfad, data={"csrf": self.csrf}, allow_redirects=False)
             self.assertEqual((r.status, r.headers["Location"]), (303, "/login"), pfad)
-        self.assertEqual((await self.c.get("/m/netzplan", allow_redirects=False)).status, 303)
+        self.assertEqual((await self.c.get("/blueprint/netz", allow_redirects=False)).headers["Location"], "/login")
 
 
     async def test_mein_tag_aus_home_assistant(self):
@@ -444,10 +444,17 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         # Übersicht: Zustand in diesem Augenblick; ein Dienst, der nicht antwortet, fällt auf
         self.app[K_DB].ausfuehren("INSERT INTO dienst (art, name, adresse, zustand, gefunden, details) VALUES ('medien','Abgeschaltet','http://127.0.0.1:1','gefunden',0,'{\"quelle\": \"hand\"}')")
         r = await self.c.get("/", allow_redirects=False)
-        self.assertEqual(r.headers["Location"], "/uebersicht")
-        text = await (await self.c.get("/uebersicht")).text()
-        for erwartet in ("2 <small>von 3</small>", "Home Assistant", "erreichbar", "Abgeschaltet", "antwortet nicht", 'href="/uebersicht" aria-current="page"'):
+        self.assertEqual(r.headers["Location"], "/blueprint")          # „Mein Tag“ ist hier noch nicht freigeschaltet
+        r = await self.c.get("/blueprint", allow_redirects=False)
+        self.assertEqual(r.headers["Location"], "/blueprint/dienste")  # ohne eigenen Plan ist „Dienste“ der erste Bereich
+        text = await (await self.c.get("/blueprint/dienste")).text()
+        for erwartet in ("2 <small>von 3</small>", "Home Assistant", "erreichbar", "Abgeschaltet", "antwortet nicht", 'href="/blueprint" aria-current="page"',
+                         '<a href="/blueprint/dienste" aria-current="page">Dienste</a>', '<a href="/blueprint/netz">Netz</a>'):
             self.assertIn(erwartet, text)
+        self.assertNotIn(">Assistent</a>", text)                       # Bereich erscheint erst mit verbundenem Notiz-Assistenten
+        for alt, neu in (("/uebersicht", "/blueprint/dienste"), ("/m/netzplan", "/blueprint/netz")):
+            r = await self.c.get(alt, allow_redirects=False)
+            self.assertEqual((r.status, r.headers["Location"]), (303, neu), alt)
         self.assertLess(text.index("Abgeschaltet"), text.index("Home Assistant"))      # Ausfälle zuerst
         # Notiz-Assistent und Home Assistant verbinden
         await self.c.post("/dienst/neu", data={"csrf": self.csrf, "adresse": f"127.0.0.1:{self.notizdienst}"}, allow_redirects=False)
@@ -466,7 +473,11 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
                          "Geteilte Ausgabe?", "Drogerie", "31,90 €", "/m/entscheid/finanzen"):
             self.assertIn(erwartet, text)
         # Assistent: KI-Nutzung, Profil, Vorschlag
-        text = await (await self.c.get("/m/assistent")).text()
+        r = await self.c.get("/m/assistent", allow_redirects=False)
+        self.assertEqual(r.headers["Location"], "/blueprint/assistent")
+        text = await (await self.c.get("/blueprint/assistent")).text()
+        self.assertIn('<a href="/blueprint/assistent" aria-current="page">Assistent</a>', text)
+        self.assertNotIn('href="/m/assistent"', text)                  # kein eigener Menüpunkt mehr
         for erwartet in ("0,42 $", "6 Aufrufe", "Tagesgrenze 1,50 $", "17,30 $", "Sonnet 3,20 $", "Trinkt morgens Tee.", "Isst mittags meist warm.", "Kam in fünf Notizen vor.", "/m/entscheid/profil"):
             self.assertIn(erwartet, text)
         self.assertNotIn(GUT, text)
@@ -482,32 +493,60 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Übernommen.", await (await self.c.get(r.headers["Location"])).text())
         # ohne Anmeldung: nichts davon
         self.c.session.cookie_jar.clear()
-        for pfad in ("/uebersicht", "/m/assistent"):
-            self.assertEqual((await self.c.get(pfad, allow_redirects=False)).status, 303, pfad)
+        for pfad in ("/blueprint", "/blueprint/dienste", "/blueprint/netz", "/blueprint/assistent", "/blueprint/plan"):
+            r = await self.c.get(pfad, allow_redirects=False)
+            self.assertEqual((r.status, r.headers["Location"]), (303, "/login"), pfad)
         r = await self.c.post("/m/entscheid/profil", data={"csrf": self.csrf, "id": "7", "annehmen": "ja"}, allow_redirects=False)
         self.assertEqual(r.status, 303)
         self.assertEqual(len(ENTSCHIEDEN), 3)
 
-    async def test_eigene_seite_aus_dem_datenordner_laeuft_abgeschottet(self):
+    async def test_eigener_plan_im_blueprint_und_weitere_eigene_seiten(self):
         ordner = pathlib.Path(self.tmp.name) / "seiten"
         ordner.mkdir()
-        (ordner / "blueprint.html").write_text("<h1>Mein Plan</h1><script>parent.fetch('/api/dienste')</script>", encoding="utf-8")
+        (ordner / "blueprint.html").write_text(
+            '<html><head><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit"><style>body{color:red}</style></head><body>'
+            '<nav class="menue" aria-label="Hauptmenü"><a class="marke" href="/">Altes Menü</a></nav><script>parent.fetch("/api/dienste")</script>'
+            '<nav class="nav"><a href="#a">Abschnitt</a></nav><h1>Mein Plan</h1><a href="http://192.0.2.9:8080/">Dienst</a><script src="/live.js" defer></script></body></html>',
+            encoding="utf-8")
+        (ordner / "notizen.html").write_text("<h1>Notizen</h1>", encoding="utf-8")
         (ordner / "Böse Datei!.html").write_text("x", encoding="utf-8")
         text = await (await self.c.get("/onboarding")).text()
-        self.assertIn('<a href="/s/blueprint">Blueprint</a>', text)
+        self.assertIn('<a href="/s/notizen">Notizen</a>', text)        # andere eigene Seiten bleiben eigene Tabs
+        self.assertNotIn('href="/s/blueprint"', text)                  # der Plan gehört zum Menüpunkt Blueprint
         self.assertNotIn("Böse", text)
-        r = await self.c.get("/s/blueprint")
-        text = await r.text()
-        self.assertIn("Mein Plan", text)
-        self.assertIn("Zurück zu Homie", text)
+        r = await self.c.get("/blueprint", allow_redirects=False)
+        self.assertEqual(r.headers["Location"], "/blueprint/plan")
+        for alt in ("/s/blueprint", "/blueprint.html"):
+            self.assertIn((await self.c.get(alt, allow_redirects=False)).headers["Location"], ("/blueprint/plan", "/blueprint"), alt)
+        seite = await (await self.c.get("/blueprint/plan")).text()
+        for erwartet in ('<nav class="menue" aria-label="Hauptmenü"><a class="marke" href="/"><i></i><span>Homie</span></a>', 'href="/blueprint" aria-current="page"',
+                         '<a href="/blueprint/plan" aria-current="page">Plan</a>', 'sandbox="allow-popups allow-popups-to-escape-sandbox"'):
+            self.assertIn(erwartet, seite)
+        marke = seite.split("/blueprint/plan/inhalt?marke=")[1].split('"')[0]
+        self.assertEqual((await self.c.get("/blueprint/plan/inhalt")).status, 404)                 # ohne Marke nichts, auch angemeldet
+        self.assertEqual((await self.c.get("/blueprint/plan/inhalt?marke=erfunden")).status, 404)
+        self.c.session.cookie_jar.clear()                                                          # der Rahmen schickt kein Cookie
+        r = await self.c.get(f"/blueprint/plan/inhalt?marke={marke}")
+        inhalt = await r.text()
+        self.assertEqual(r.status, 200)
+        for erwartet in ("Mein Plan", "Abschnitt", 'target="_blank" rel="noopener noreferrer" href="http://192.0.2.9:8080/"', "/static/schrift/outfit-latin.woff2"):
+            self.assertIn(erwartet, inhalt)
+        for weg in ("Altes Menü", "<script", "googleapis", "live.js"):                              # altes Menü, Skripte und Internet-Verweise sind entfernt
+            self.assertNotIn(weg, inhalt)
         regel = r.headers["Content-Security-Policy"]
-        self.assertTrue(regel.startswith("sandbox allow-scripts"))
-        self.assertNotIn("allow-same-origin", regel)       # die Seite kommt nicht an Homies Sitzung oder Schnittstellen
-        self.assertNotIn("connect-src", regel)             # und darf nichts nachladen (default-src ohne Netzadressen)
+        self.assertTrue(regel.startswith("sandbox allow-popups"))
+        self.assertNotIn("allow-scripts", regel)
+        self.assertNotIn("allow-same-origin", regel)
+        self.assertNotIn("X-Frame-Options", r.headers)
+        self.assertEqual((await self.c.get(f"/api/dienste?marke={marke}")).status, 401)           # die Marke öffnet sonst nichts
+        self.assertEqual((await self.c.get(f"/s/notizen?marke={marke}", allow_redirects=False)).status, 303)
+        self.assertEqual((await self.c.get("/static/schrift/outfit-latin.woff2")).headers["Access-Control-Allow-Origin"], "*")
+        await self.c.post("/login", data={"passwort": PW}, allow_redirects=False)
+        r = await self.c.get("/s/notizen")                                                         # weitere eigene Seiten: wie bisher abgeschottet
+        self.assertIn("Notizen", await r.text())
+        self.assertTrue(r.headers["Content-Security-Policy"].startswith("sandbox allow-scripts"))
         for pfad in ("/s/gibtsnicht", "/s/..%2Fhomie.sqlite", "/s/B%C3%B6se%20Datei!"):
             self.assertEqual((await self.c.get(pfad)).status, 404, pfad)
-        self.c.session.cookie_jar.clear()
-        self.assertEqual((await self.c.get("/s/blueprint", allow_redirects=False)).status, 303)
 
     async def test_verbinden_ohne_browser(self):
         from homie.__main__ import dienst_verbinden
@@ -528,6 +567,7 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(in_ordnung)
         self.assertTrue({"aufnahme", "finanzen", "assistent", "tag", "gesundheit"} <= self.aktiv())
         self.assertEqual(len([d for d in await (await self.c.get("/api/dienste")).json()]), 2)
+
 
     async def test_briefkasten_fuer_die_gesundheits_app(self):
         GELIEFERT.clear()
@@ -557,6 +597,7 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         for _ in range(30):
             await senden({"Authorization": HANDY}, b"{}")
         self.assertEqual((await senden({"Authorization": HANDY}, b"{}")).status, 429)             # Bremse gegen Überfluten
+
 
     async def test_von_hand_hinzufuegen_und_dokumente_lesen(self):
         self.assertNotIn("Dokumente</a>", await (await self.c.get("/onboarding")).text())

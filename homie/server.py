@@ -6,6 +6,7 @@ import hmac
 import ipaddress
 import json
 import re
+import secrets
 import time
 from urllib.parse import urlsplit
 
@@ -38,6 +39,7 @@ K_ERK = web.AppKey("erkundung", Erkundung)
 K_SITZUNG = web.RequestKey("sitzung", object)
 K_AGENT = web.RequestKey("agent", str)
 K_LAUF = web.AppKey("lauf", dict)
+K_MARKEN = web.AppKey("marken", dict)       # kurzlebige Marken für den Rahmen mit dem eigenen Plan: Marke → gültig bis
 K_BRIEFE = web.AppKey("briefe", dict)       # Bremse für den Briefkasten der Gesundheits-App: Absender → Zeitpunkte
 BRIEFKASTEN = "/api/health-webhook"
 
@@ -62,6 +64,11 @@ async def kopfzeilen(request: web.Request, handler):
         antwort = e
     for k, v in KOPFZEILEN.items():
         antwort.headers.setdefault(k, v)
+    if antwort.headers.get("X-Frame-Options") == "":      # eine Antwort, die bewusst in Homies eigenem Rahmen erscheinen darf
+        del antwort.headers["X-Frame-Options"]
+    if request.path.startswith("/static/schrift/"):
+        # Der abgeschottete Plan lädt die Schriften „von außen“ (er hat keine eigene Herkunft); Schriften sind kein Geheimnis.
+        antwort.headers["Access-Control-Allow-Origin"] = "*"
     if not request.path.startswith("/static/") and "Cache-Control" not in antwort.headers:
         antwort.headers["Cache-Control"] = "no-store"
     if isinstance(antwort, web.HTTPException):
@@ -94,6 +101,12 @@ async def torwaechter(request: web.Request, handler):
             return web.json_response({"fehler": "kein gültiger Agenten-Schlüssel"}, status=401)
         request[K_AGENT] = name
         return await handler(request)
+    if request.path == "/blueprint/plan/inhalt" and request.method == "GET":
+        # Der abgeschottete Rahmen schickt kein Anmelde-Cookie mit. Er weist sich mit einer Marke aus, die Homie
+        # dem angemeldeten Nutzer Sekunden vorher ausgestellt hat; sie gilt nur für diesen einen Weg und nur kurz.
+        if request.app[K_MARKEN].get(request.query.get("marke", ""), 0) > time.time():
+            return await handler(request)
+        raise web.HTTPNotFound()
     if request.path == BRIEFKASTEN and request.method == "POST":
         # Die Gesundheits-App am Handy hat keine Anmeldung bei Homie. Sie weist sich mit ihrer Unterschrift aus,
         # die der Notiz-Assistent prüft – ohne Unterschrift nimmt schon Homie nichts an.
@@ -126,15 +139,31 @@ def _eigene_seiten(app: web.Application) -> list[dict]:
             for d in dateien[:8] if re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,30}", d.stem)]
 
 
+def _blueprint_tabs(app: web.Application, stand: list) -> list[dict]:
+    """Die Bereiche unter dem Menüpunkt „Blueprint“ – nur die, die es bei dieser Installation gibt."""
+    aktiv = {s.modul.id for s in stand if s.aktiv}
+    tabs = []
+    if any(e["id"] == "blueprint" for e in _eigene_seiten(app)):
+        tabs.append({"pfad": "/blueprint/plan", "titel": "Plan"})
+    tabs.append({"pfad": "/blueprint/dienste", "titel": "Dienste"})
+    if "netzplan" in aktiv:
+        tabs.append({"pfad": "/blueprint/netz", "titel": "Netz"})
+    if "assistent" in aktiv:
+        tabs.append({"pfad": "/blueprint/assistent", "titel": "Assistent"})
+    return tabs
+
+
 def _seite(request: web.Request, vorlage: str, status: int = 200, **werte) -> web.Response:
     app = request.app
     sitzung = request.get(K_SITZUNG)
     menue = []
     if sitzung is not None:
-        menue = [s.modul for s in module.stand(app[K_DB], app[K_ABLAGE]) if s.aktiv]
+        stand = module.stand(app[K_DB], app[K_ABLAGE])
+        menue = [s.modul for s in stand if s.aktiv and s.modul.menue]
+        werte.setdefault("bp_tabs", _blueprint_tabs(app, stand))
     html = app[K_JINJA].get_template(vorlage).render(
         version=VERSION, pfad=request.path, menue=menue, csrf=sitzung.csrf if sitzung else "",
-        eigene_seiten=_eigene_seiten(app) if sitzung is not None else [], **werte
+        eigene_seiten=[e for e in _eigene_seiten(app) if e["id"] != "blueprint"] if sitzung is not None else [], **werte
     )
     return web.Response(text=html, content_type="text/html", status=status)
 
@@ -210,12 +239,16 @@ async def logout(request: web.Request) -> web.Response:
 # ---------- Seiten ----------
 
 async def start(request: web.Request) -> web.Response:
-    raise web.HTTPSeeOther("/uebersicht" if _dienste(request.app) else "/onboarding")
+    app = request.app
+    if not _dienste(app):
+        raise web.HTTPSeeOther("/onboarding")
+    tag_da = any(s.aktiv and s.modul.id == "tag" for s in module.stand(app[K_DB], app[K_ABLAGE]))
+    raise web.HTTPSeeOther("/m/tag" if tag_da else "/blueprint")
 
 
 # Adressen, unter denen Seiten früher erreichbar waren (Lesezeichen, App-Symbol auf dem Handy) → heutige Seite
-FRUEHER = {"/mein-tag": "/m/tag", "/index.html": "/m/tag", "/dokumente": "/m/dokumente", "/aufnahme": "/m/aufnahme", "/blueprint": "/s/blueprint",
-           "/blueprint.html": "/s/blueprint"}
+FRUEHER = {"/mein-tag": "/m/tag", "/index.html": "/m/tag", "/dokumente": "/m/dokumente", "/aufnahme": "/m/aufnahme", "/blueprint.html": "/blueprint",
+           "/uebersicht": "/blueprint/dienste", "/s/blueprint": "/blueprint/plan"}
 
 
 async def frueher(request: web.Request) -> web.Response:
@@ -241,7 +274,53 @@ async def uebersicht(request: web.Request) -> web.Response:
         k["da"], k["ms"] = da, ms
     karten.sort(key=lambda k: (k["da"], k["zustand"] != "verbunden", k["name"].lower()))
     return _seite(request, "uebersicht.html", dienste=karten, da=sum(1 for k in karten if k["da"]),
-                  module=[s for s in module.stand(app[K_DB], app[K_ABLAGE]) if s.aktiv and not s.modul.kern], letzte=letzte(app[K_DB]))
+                  module=[s for s in module.stand(app[K_DB], app[K_ABLAGE]) if s.aktiv and s.modul.menue and not s.modul.kern], letzte=letzte(app[K_DB]))
+
+
+async def blueprint(request: web.Request) -> web.Response:
+    raise web.HTTPSeeOther(_blueprint_tabs(request.app, module.stand(request.app[K_DB], request.app[K_ABLAGE]))[0]["pfad"])
+
+
+def _plan_datei(app: web.Application):
+    return next((e["datei"] for e in _eigene_seiten(app) if e["id"] == "blueprint"), None)
+
+
+async def blueprint_plan(request: web.Request) -> web.Response:
+    if _plan_datei(request.app) is None:
+        raise web.HTTPSeeOther("/blueprint/dienste")
+    marken, jetzt = request.app[K_MARKEN], time.time()
+    for alt in [m for m, bis in marken.items() if bis < jetzt]:
+        del marken[alt]
+    marke = secrets.token_urlsafe(24)
+    marken[marke] = jetzt + 300
+    return _seite(request, "blueprint_plan.html", marke=marke)
+
+
+async def blueprint_plan_inhalt(request: web.Request) -> web.Response:
+    """Der eigene, handgeschriebene Plan (seiten/blueprint.html) – als Standbild in Homies Rahmen.
+
+    Er läuft abgeschottet und ohne Skripte; sein eigenes Menüband und Verweise ins Internet werden entfernt,
+    die Schriften kommen von Homie. Verweise auf Dienste öffnen sich in einem neuen Tab."""
+    datei = _plan_datei(request.app)
+    if datei is None:
+        raise web.HTTPNotFound()
+    try:
+        inhalt = datei.read_text(encoding="utf-8", errors="replace")[:5_000_000]
+    except OSError:
+        raise web.HTTPNotFound()
+    hier = f"{'https' if _https(request) else 'http'}://{request.host}"
+    inhalt = re.sub(r"<script\b.*?</script>", "", inhalt, flags=re.S | re.I)
+    inhalt = re.sub(r"<nav\b[^>]*class=\"menue\".*?</nav>", "", inhalt, count=1, flags=re.S | re.I)
+    inhalt = re.sub(r"<link\b[^>]*(fonts\.googleapis|rel=\"icon\")[^>]*>", "", inhalt, flags=re.I)
+    inhalt = re.sub(r"<a\b(?![^>]*\btarget=)([^>]*\bhref=\"https?://)", r'<a target="_blank" rel="noopener noreferrer"\1', inhalt, flags=re.I)
+    schrift = (PAKET / "static" / "schrift" / "schrift.css").read_text(encoding="utf-8").replace('url("/static/', f'url("{hier}/static/')
+    zusatz = f"<style>{schrift}\nnav.menue {{ display: none !important; }} body {{ padding-top: 14px !important; }}</style>"
+    stelle = inhalt.lower().find("</head>")
+    inhalt = inhalt[:stelle] + zusatz + inhalt[stelle:] if stelle >= 0 else zusatz + inhalt
+    return web.Response(text=inhalt, content_type="text/html", headers={
+        "Content-Security-Policy": "sandbox allow-popups allow-popups-to-escape-sandbox; default-src 'none'; style-src 'unsafe-inline'; "
+                                   f"img-src * data: blob:; font-src {hier}; frame-ancestors {hier}",
+        "X-Frame-Options": ""})
 
 
 ZURUECK = ('<a href="/" style="position:fixed;z-index:2147483647;left:12px;bottom:12px;padding:9px 16px;border-radius:999px;'
@@ -252,6 +331,8 @@ ZURUECK = ('<a href="/" style="position:fixed;z-index:2147483647;left:12px;botto
 async def eigene_seite(request: web.Request) -> web.Response:
     """Eigene Seite aus dem Datenordner. Sie läuft abgeschottet: Skripte dürfen laufen, kommen aber weder an Homies
     Sitzung noch an seine Schnittstellen, und laden nichts aus dem Internet nach (außer Bildern)."""
+    if request.match_info["name"] == "blueprint":
+        raise web.HTTPSeeOther("/blueprint/plan")
     seite = next((s for s in _eigene_seiten(request.app) if s["id"] == request.match_info["name"]), None)
     if seite is None:
         raise web.HTTPNotFound()
@@ -480,7 +561,7 @@ async def entscheid(request: web.Request) -> web.Response:
     daten = await request.post()
     art = request.match_info["art"]
     _, meldung = await assistent.entscheid(zugang[0], zugang[1]["token"], art, str(daten.get("id", ""))[:80], daten.get("annehmen") == "ja")
-    ziel = {"finanzen": "/m/finanzen", "training": "/m/gesundheit", "profil": "/m/assistent"}[art]
+    ziel = {"finanzen": "/m/finanzen", "training": "/m/gesundheit", "profil": "/blueprint/assistent"}[art]
     raise web.HTTPSeeOther(str(URL(ziel).with_query(meldung=meldung)))
 
 
@@ -743,15 +824,8 @@ async def modulseite(request: web.Request) -> web.Response:
     kennung = request.match_info["id"]
     for s in module.stand(request.app[K_DB], request.app[K_ABLAGE]):
         if s.modul.id == kennung and s.aktiv and not s.modul.kern:
-            if kennung == "netzplan":
-                virt, virt_fehler = None, ""
-                zugang = _zugang(request.app, "virtualisierung", ("token-id", "token"))
-                if zugang:
-                    try:
-                        virt = await proxmox.lesen(zugang[0], zugang[1]["token-id"], zugang[1]["token"])
-                    except proxmox.ProxmoxFehler as e:
-                        virt_fehler = str(e)
-                return _seite(request, "netzplan.html", modul=s.modul, virt=virt, virt_fehler=virt_fehler, **_netzplan(request.app))
+            if s.modul.ziel:      # gehört zu einem anderen Menüpunkt (Netz, Assistent → Blueprint)
+                raise web.HTTPSeeOther(s.modul.ziel)
             if kennung == "dokumente":
                 return await _seite_dokumente(request, s.modul)
             if kennung == "tag":
@@ -762,10 +836,31 @@ async def modulseite(request: web.Request) -> web.Response:
                 return await _seite_aufnahme(request, s.modul)
             if kennung == "finanzen":
                 return await _seite_finanzen(request, s.modul)
-            if kennung == "assistent":
-                return await _seite_assistent(request, s.modul)
             return _seite(request, "modul.html", modul=s.modul)
     raise web.HTTPNotFound(text="Dieses Modul ist nicht aktiv.")
+
+
+def _bereich(request: web.Request, kennung: str) -> module.Modul:
+    for s in module.stand(request.app[K_DB], request.app[K_ABLAGE]):
+        if s.modul.id == kennung and s.aktiv:
+            return s.modul
+    raise web.HTTPSeeOther("/blueprint/dienste")
+
+
+async def blueprint_netz(request: web.Request) -> web.Response:
+    modul = _bereich(request, "netzplan")
+    virt, virt_fehler = None, ""
+    zugang = _zugang(request.app, "virtualisierung", ("token-id", "token"))
+    if zugang:
+        try:
+            virt = await proxmox.lesen(zugang[0], zugang[1]["token-id"], zugang[1]["token"])
+        except proxmox.ProxmoxFehler as e:
+            virt_fehler = str(e)
+    return _seite(request, "netzplan.html", modul=modul, virt=virt, virt_fehler=virt_fehler, **_netzplan(request.app))
+
+
+async def blueprint_assistent(request: web.Request) -> web.Response:
+    return await _seite_assistent(request, _bereich(request, "assistent"))
 
 
 # ---------- API (nur angemeldet) ----------
@@ -809,6 +904,7 @@ def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, er
     app[K_ERK] = Erkundung(db, einst.docker_url, erkundung_ziele, erkundung_ports)
     app[K_LAUF] = lauf or {}
     app[K_BRIEFE] = {}
+    app[K_MARKEN] = {}
     plaene.unterbrochene_markieren(db)
     app[K_JINJA] = jinja2.Environment(
         loader=jinja2.FileSystemLoader(PAKET / "templates"), autoescape=True, trim_blocks=True, lstrip_blocks=True
@@ -819,7 +915,12 @@ def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, er
         web.get("/login", login_zeigen), web.post("/login", login),
         web.post("/logout", logout),
         web.get("/onboarding", onboarding),
-        web.get("/uebersicht", uebersicht),
+        web.get("/blueprint", blueprint),
+        web.get("/blueprint/plan", blueprint_plan),
+        web.get("/blueprint/plan/inhalt", blueprint_plan_inhalt),
+        web.get("/blueprint/dienste", uebersicht),
+        web.get("/blueprint/netz", blueprint_netz),
+        web.get("/blueprint/assistent", blueprint_assistent),
         *[web.get(weg + zusatz, frueher) for weg in FRUEHER for zusatz in ("", "/") if not weg.endswith(".html") or not zusatz],
         web.get("/s/{name}", eigene_seite),
         web.post("/m/entscheid/{art:finanzen|training|profil}", entscheid),
