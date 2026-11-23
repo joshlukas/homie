@@ -203,3 +203,7 @@ scripts/privat-pruefung.sh                              # vor jedem Push: nichts
 ```
 
 Wer sich von einem KI-Agenten helfen lässt: [AGENTS.md](AGENTS.md).
+
+## Lizenz
+
+Homie steht unter der [MIT-Lizenz](LICENSE). Die mitgelieferten Schriften Outfit und Plus Jakarta Sans stehen unter der SIL Open Font License, siehe [homie/static/schrift/LIZENZ.txt](homie/static/schrift/LIZENZ.txt).
