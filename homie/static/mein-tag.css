@@ -502,3 +502,14 @@ details.mehr .card{ -webkit-backdrop-filter: none; backdrop-filter: none; }
 /* Homie: Abmelden im Menü */
 .menue .abmelden { margin: 0 0 0 auto; flex: none; }
 .menue .abmelden button { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface-strong); color: var(--text); font: 600 13px var(--body); cursor: pointer; }
+
+/* ---------- Bild des Tages: links neben den Kopfkacheln, am Handy als flacher Streifen darüber ---------- */
+.kopf { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin: 4px 0 8px; }
+.kopf .tiles { margin: 0; }
+.kopf.mitbild { grid-template-columns: minmax(200px, 270px) minmax(0, 1fr); }
+.bildtag { position: relative; display: block; min-height: 168px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow); background: var(--surface); }
+.bildtag[hidden] { display: none; }
+.bildtag img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s; }
+.bildtag:hover img { transform: scale(1.03); }
+.bildtag span { position: absolute; left: 10px; bottom: 10px; padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600; color: #fff; background: rgba(10, 12, 30, 0.55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+@media (max-width: 760px) { .kopf.mitbild { grid-template-columns: minmax(0, 1fr); } .bildtag { min-height: 0; aspect-ratio: 21 / 9; max-height: 180px; width: 100%; } }

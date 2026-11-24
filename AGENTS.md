@@ -49,6 +49,7 @@ Ein vorgeschlagener Plan ist ein Entwurf. Lesen, bestätigen und ausführen kann
 | `homie/gesundheit.py`, `homie/tag.py` | Modul Gesundheit: liest Home Assistant; `tag.py` liefert nur die Zeitzone |
 | `homie/assistent.py` | Module Aufnahme, Finanzen, Assistent: lesen den Notiz-Assistenten; geben neue Aufnahmen, Fotos, Kontoauszüge und Entscheidungen zu Vorschlägen an ihn weiter (`static/hochladen.js`) |
 | `homie/dokumente.py` | Modul Dokumente: liest Paperless-ngx (nur lesend, nichts wird gespeichert); die Seite dazu ist `static/dokumente.js` |
+| `homie/bildtag.py` | Bild des Tages: wählt täglich ein Bild aus dem nur lesbar eingehängten Ordner `/bilder`; ausgeliefert unter `GET /api/bild-des-tages` mit fester Bildart (nie HTML oder SVG) |
 | `homie/yamtrack.py` | Gesehenes in Yamtrack eintragen: Prüfung der Aufträge und der kleine Helfer mit Docker-Zugang (`python -m homie yamtrack-helfer`) |
 | `homie/proxmox.py` | Proxmox lesen (VMs, Container, Speicher) |
 | `homie/plaene.py` | Pläne entwerfen und prüfen; enthält bewusst keinen schreibenden Aufruf |

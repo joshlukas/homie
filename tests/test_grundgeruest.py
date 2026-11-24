@@ -149,6 +149,55 @@ class Web(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("geheim-123", await (await self.c.get("/api/dienste")).text())
 
 
+
+class BildDesTages(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.bilder = Path(self.tmp.name) / "bilder"
+        self.bilder.mkdir()
+        self.einst = laden({"HOMIE_DATA": str(Path(self.tmp.name) / "daten"), "HOMIE_DOCKER_LESEN": "0", "HOMIE_BILDER": str(self.bilder)})
+        self.c = TestClient(TestServer(app_bauen(self.einst)))
+        await self.c.start_server()
+
+    async def asyncTearDown(self):
+        await self.c.close()
+        self.tmp.cleanup()
+
+    async def test_bild_nur_angemeldet_und_nur_bilder(self):
+        self.assertEqual((await self.c.get("/api/bild-des-tages", allow_redirects=False)).status, 401)
+        r = await self.c.post("/einrichten", data={"passwort": PW, "wiederholung": PW}, allow_redirects=False)
+        self.assertEqual(r.status, 303)
+        # leerer Ordner: kein Bild, die Seite bekommt eine leere Marke
+        self.assertEqual((await self.c.get("/api/bild-des-tages")).status, 404)
+        self.assertEqual((await (await self.c.get("/api/tag?tage=1")).json())["bild"], "")
+        # was kein Bild ist oder versteckt liegt, zählt nicht
+        (self.bilder / "seite.html").write_text("<script>1</script>")
+        (self.bilder / "zeichnung.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'/>")
+        (self.bilder / ".versteckt.jpg").write_bytes(b"x")
+        (self.bilder / "leer.png").write_bytes(b"")
+        self.assertEqual((await self.c.get("/api/bild-des-tages")).status, 404)
+        (self.bilder / "urlaub").mkdir()
+        (self.bilder / "urlaub" / "Strand.JPG").write_bytes(b"\xff\xd8\xff\xe0bild")
+        r = await self.c.get("/api/bild-des-tages")
+        self.assertEqual(r.status, 200)
+        self.assertEqual(r.headers["Content-Type"], "image/jpeg")
+        self.assertEqual(r.headers["X-Content-Type-Options"], "nosniff")
+        self.assertEqual(await r.read(), b"\xff\xd8\xff\xe0bild")
+        self.assertRegex((await (await self.c.get("/api/tag?tage=1")).json())["bild"], "^[0-9a-f]{16}$")
+
+    def test_jeden_tag_ein_anderes_bis_alle_dran_waren(self):
+        import datetime as dt
+        from homie import bildtag
+        for i in range(7):
+            (self.bilder / f"b{i}.png").write_bytes(b"p")
+        start = dt.date(2026, 11, 24)
+        start -= dt.timedelta(days=start.toordinal() % 7)          # Beginn einer Runde
+        runde = [bildtag.heute(self.bilder, start + dt.timedelta(days=i)).name for i in range(7)]
+        self.assertEqual(len(set(runde)), 7)
+        self.assertEqual(bildtag.heute(self.bilder, start).name, runde[0])   # am selben Tag immer dasselbe
+        self.assertIsNone(bildtag.heute(self.bilder / "gibtsnicht", start))
+
+
 class Bausteine(unittest.TestCase):
     def test_passwort_hash(self):
         h = passwort_hashen(PW)

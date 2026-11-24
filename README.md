@@ -143,6 +143,7 @@ Eine Sicherung von Homie ist eine Sicherung dieses Volumes. Wer das Volume samt 
 
 - **homie** – das Dashboard. Läuft im Netz des Rechners (`network_mode: host`), damit die spätere Erkundung Geräte im Heimnetz sehen kann. Ohne Root-Rechte, Dateisystem nur lesbar, schreibt ausschließlich in den Datenordner.
 - **docker-lesen** – ein Zwischendienst, der Homie einen *nur lesenden* Blick auf Docker gibt (welche Container laufen). Homie bekommt den Docker-Zugang nie direkt, und der Zwischendienst ist nur auf dem Rechner selbst erreichbar. Abschalten mit `HOMIE_DOCKER_LESEN=0`.
+- **bilder-freigabe** – freiwillig und von Haus aus abgeschaltet (`HOMIE_BILDER_FREIGABE=1` schaltet sie ein). Gibt den Bilder-Ordner für das Bild des Tages im Heimnetz frei (Samba, Port 445, ohne Passwort). Sieht nur diesen einen Ordner, läuft ohne Sonderrechte und wird beim ersten Start auf dem Rechner selbst aus dem offiziellen Alpine-Abbild gebaut.
 - **yamtrack-helfer** – freiwillig und von Haus aus abgeschaltet (`HOMIE_YAMTRACK_SCHREIBEN=1` schaltet ihn ein). Trägt Gesehenes aus Sprachnotizen in ein Yamtrack ein, das auf demselben Rechner läuft. Dafür hat dieser eine Helfer den Docker-Zugang – wer den hat, könnte grundsätzlich alles auf dem Rechner. Deshalb ist er von Homie getrennt, nur auf dem Rechner selbst erreichbar, kennt genau zwei Aufträge (Titel suchen, Gesehenes eintragen) und führt nur sein festes Programm im Yamtrack-Container aus. Aufträge nimmt Homie nur vom verbundenen Notiz-Assistenten an (`POST /api/yamtrack`, mit dessen Schlüssel).
 
 Einstellungen sind freiwillig; alle stehen mit Erklärung in [.env.example](.env.example). Auf Docker Desktop (Windows/Mac) funktioniert das Heimnetz des Rechners anders – vorgesehen ist ein Linux-Rechner.
@@ -177,6 +178,12 @@ Schickt eine Gesundheits-App auf dem Handy ihre Daten an `…/api/health-webhook
 ## Fotos und Kontoauszüge
 
 Auf der Seite *Aufnahme* lässt sich neben der Sprachnotiz ein Foto aufnehmen oder eine Datei wählen; dieselben Knöpfe stehen auf der Seite *Finanzen*. Ein Foto (Kassenbon, Rechnung, Zettel) geht an den Notiz-Assistenten, der es liest und wie eine Sprachnotiz einordnet. Ein Kontoauszug (Umsatz-Export der Bank als CSV oder Excel) geht in die Finanzauswertung. Homie reicht beides nur durch und behält nichts.
+
+## Bild des Tages
+
+„Mein Tag“ zeigt oben neben den Kacheln ein Bild, jeden Tag ein anderes. Die Bilder (jpg, png, webp, gif, avif) liegen im Volume `homie-bilder`; Homie liest dort nur. Ist der Ordner leer, bleibt der Platz weg. Wiederholt wird ein Bild erst, wenn alle an der Reihe waren.
+
+Mit `HOMIE_BILDER_FREIGABE=1` gibt der kleine Dienst `bilder-freigabe` diesen einen Ordner im Heimnetz als Windows-Freigabe frei: `smb://<Rechner>/bilder`, zum Lesen und Schreiben. Die Freigabe hat **kein Passwort** – jedes Gerät im Heimnetz kann Bilder ablegen und löschen. Schalte sie nur ein, wenn du allen Geräten dort vertraust; angenommen werden ohnehin nur private Adressen. Ohne Freigabe kommen Bilder zum Beispiel mit `docker cp` in das Volume.
 
 ## Eigene Seiten
 

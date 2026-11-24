@@ -25,6 +25,7 @@ services:
       TZ: ${TZ:-Europe/Berlin}
     volumes:
       - homie-daten:/data          # alles Private: Konto, Erkanntes, verschlüsselte Schlüssel
+      - homie-bilder:/bilder:ro    # Bilder für das „Bild des Tages“ auf „Mein Tag“; Homie liest hier nur
       # Freiwillig, nur wenn Yamtrack auf demselben Rechner läuft: seine Datenbank nur lesbar einhängen,
       # dann zeigt „Mein Tag“ auch Gesehenes. Den Namen des Volumes zeigt „docker volume ls“.
       # - yamtrack_db:/yamtrack:ro
@@ -91,6 +92,68 @@ services:
       disable: true
     logging: *protokoll
 
+  # Freiwillig (HOMIE_BILDER_FREIGABE=1): gibt den Bilder-Ordner im Heimnetz als Windows-Freigabe (Samba) frei, zum
+  # Lesen und Schreiben: smb://<Rechner>/bilder (Windows: \\<Rechner>\bilder). Was dort liegt, zeigt „Mein Tag“ als Bild des Tages.
+  # OHNE Passwort: Jedes Gerät, das den Rechner im Heimnetz erreicht, kann Bilder ablegen und löschen. Angenommen werden
+  # nur Geräte mit privater Adresse (Heimnetz, VPN). Die Freigabe sieht ausschließlich diesen einen Ordner.
+  # Gebaut wird sie beim ersten Start auf dem Rechner selbst, aus dem offiziellen Alpine-Abbild und dessen Samba-Paket.
+  bilder-freigabe:
+    image: homie-bilder-freigabe:lokal
+    pull_policy: build
+    build:
+      dockerfile_inline: |
+        FROM alpine:3.22
+        RUN apk add --no-cache samba && mkdir /bilder
+        COPY <<EOF /etc/samba/smb.conf
+        [global]
+          server role = standalone server
+          server string = Homie Bilder
+          map to guest = Bad User
+          guest account = nobody
+          server min protocol = SMB2
+          hosts allow = 127. 10. 192.168. 172.16. 172.17. 172.18. 172.19. 172.20. 172.21. 172.22. 172.23. 172.24. 172.25. 172.26. 172.27. 172.28. 172.29. 172.30. 172.31.
+          hosts deny = ALL
+          load printers = no
+          printing = bsd
+          printcap name = /dev/null
+          disable spoolss = yes
+          disable netbios = yes
+          smb ports = 445
+          log level = 1
+        [bilder]
+          comment = Bilder fuer das Bild des Tages in Homie
+          path = /bilder
+          guest ok = yes
+          guest only = yes
+          read only = no
+          create mask = 0644
+          directory mask = 0755
+          veto files = /*.exe/*.html/*.htm/*.svg/*.js/
+        EOF
+    container_name: homie-bilder-freigabe
+    restart: unless-stopped
+    deploy:
+      replicas: ${HOMIE_BILDER_FREIGABE:-0}
+    # Der Ordner gehört danach dem rechtlosen Benutzer, unter dem alle Zugriffe laufen.
+    command: ["sh", "-c", "mkdir -p /var/lib/samba/private && chown nobody:nobody /bilder && exec smbd --foreground --no-process-group --debug-stdout"]
+    ports:
+      - "${HOMIE_BILDER_PORT:-445}:445"
+    volumes:
+      - homie-bilder:/bilder
+    read_only: true
+    tmpfs:
+      - /var/lib/samba
+      - /var/cache/samba
+      - /run/samba
+      - /var/log/samba
+      - /tmp
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    logging: *protokoll
+
 volumes:
   homie-daten:
     name: homie-daten
+  homie-bilder:
+    name: homie-bilder

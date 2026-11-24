@@ -252,6 +252,12 @@ function render(d) {
   const KA = d.kalender, offenA = aufgaben.length, vorschl = d.profil && d.profil.vorschlaege ? d.profil.vorschlaege.length : 0, naechster = KA && KA.termine && KA.termine[0];
   kachel("Zu erledigen", offenA + (offenA === 1 ? " Aufgabe" : " Aufgaben"), (naechster ? `nächster Termin: ${esc(naechster.titel.slice(0, 28))}, ${fmtDay((naechster.beginn || "").slice(0, 10))}` : "kein Termin in den nächsten Tagen") + (vorschl ? ` · ${vorschl} Vorschläge` : ""), offenA || vorschl ? "var(--warn)" : "var(--good)", "Jetzt wichtig");
   $("#tiles").innerHTML = lage.join("");
+  // Bild des Tages: nur wenn im Bilder-Ordner etwas liegt; lässt es sich nicht laden, verschwindet der Platz wieder
+  const bt = $("#bildtag"), adr = d.bild ? "/api/bild-des-tages?v=" + encodeURIComponent(d.bild) : "";
+  if (bt && bt.dataset.v !== adr) {
+    bt.dataset.v = adr; bt.hidden = !adr; $("#kopf").classList.toggle("mitbild", !!adr);
+    if (adr) { const im = bt.querySelector("img"); im.onerror = () => { bt.hidden = true; $("#kopf").classList.remove("mitbild"); }; im.src = adr; bt.href = adr; }
+  }
 
   // ---------- Darunter: offen nur, was jetzt zählt; alles Weitere eingeklappt, leere Karten entfallen ----------
   const titel = (h) => (h.match(/<h2><i><\/i>([^<]+)/) || [, ""])[1].trim();

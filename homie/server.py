@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import datetime as dt
 import hmac
 import ipaddress
 import json
@@ -15,11 +16,12 @@ import jinja2
 from aiohttp import web
 from yarl import URL
 
-from . import agenten, assistent, ausfuehren, dokumente, gesundheit, katalog, meintag, module, plaene, proxmox, verbinden, yamtrack
+from . import agenten, assistent, ausfuehren, bildtag, dokumente, gesundheit, katalog, meintag, module, plaene, proxmox, verbinden, yamtrack
 from .ablage import Ablage
 from .anmeldung import COOKIE, MIN_LAENGE, Anmeldung, passwort_maengel
 from .config import PAKET, VERSION, Einstellungen
 from .db import Datenbank
+from .tag import zone
 from .erkundung import Erkundung, letzte, von_hand
 
 OEFFENTLICH = ("/login", "/einrichten")
@@ -509,9 +511,24 @@ async def api_tag(request: web.Request) -> web.Response:
         tage = int(request.query.get("tage", "7"))
     except ValueError:
         tage = 7
-    return web.json_response(await meintag.schnappschuss(
-        _zugang(app, "assistent", ("token",)), _zugang(app, "homeassistant", ("token",)), tage, _ich(app), app[K_EINST].yamtrack),
-        dumps=lambda o: json.dumps(o, ensure_ascii=False))
+    daten = await meintag.schnappschuss(
+        _zugang(app, "assistent", ("token",)), _zugang(app, "homeassistant", ("token",)), tage, _ich(app), app[K_EINST].yamtrack)
+    bild, tag = await _bild_heute(app)
+    return web.json_response({**daten, "bild": bildtag.marke(bild, tag) if bild else ""}, dumps=lambda o: json.dumps(o, ensure_ascii=False))
+
+
+async def _bild_heute(app: web.Application):
+    tag = dt.datetime.now(zone()).date()
+    return await asyncio.get_running_loop().run_in_executor(None, bildtag.heute, app[K_EINST].bilder, tag), tag
+
+
+async def api_bild(request: web.Request) -> web.StreamResponse:
+    """Das Bild des Tages aus dem Bilder-Ordner. Die Art steht fest (nie HTML oder SVG), geändert wird nichts."""
+    bild, _ = await _bild_heute(request.app)
+    if bild is None:
+        raise web.HTTPNotFound()
+    return web.FileResponse(bild, headers={"Content-Type": bildtag.ARTEN[bild.suffix.lower()], "Cache-Control": "private, max-age=86400",
+                                           "Content-Disposition": "inline"})
 
 
 async def api_tag_entscheid(request: web.Request) -> web.Response:
@@ -981,6 +998,7 @@ def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, er
         web.get("/api/dienste", api_dienste),
         web.get("/api/erkundung", api_erkundung),
         web.get("/api/tag", api_tag),
+        web.get("/api/bild-des-tages", api_bild),
         web.post(BRIEFKASTEN, briefkasten),
         web.post(YAMTRACK_WEG, api_yamtrack),
         web.post("/m/finanzen/import", finanzen_import),

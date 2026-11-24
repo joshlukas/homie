@@ -34,6 +34,30 @@ tag = lambda n: (HEUTE - dt.timedelta(days=n)).isoformat()                      
 zeit = lambda n, h, m=0: f"{tag(n)}T{h:02d}:{m:02d}+01:00"
 
 
+def _bilder(ordner: pathlib.Path) -> pathlib.Path:
+    """Drei gezeichnete Landschaften für das „Bild des Tages“ – errechnet, nicht fotografiert."""
+    import math
+    import struct
+    import zlib
+    ordner.mkdir(parents=True, exist_ok=True)
+    b, h = 640, 400
+    for nr, (oben, unten, berg) in enumerate((((255, 170, 120), (120, 70, 160), (40, 30, 80)), ((120, 190, 255), (230, 240, 255), (40, 90, 80)),
+                                              ((30, 30, 80), (200, 90, 150), (15, 15, 40)))):
+        zeilen = bytearray()
+        for y in range(h):
+            zeilen.append(0)
+            for x in range(b):
+                kamm = h * 0.62 + 46 * math.sin(x / 71 + nr) + 22 * math.sin(x / 23 + nr * 2) + 10 * math.sin(x / 9)
+                sonne = math.hypot(x - b * (0.3 + 0.2 * nr), y - h * 0.38) < 34
+                t = y / h
+                farbe = berg if y > kamm else (255, 240, 200) if sonne else tuple(int(o + (u - o) * t) for o, u in zip(oben, unten))
+                zeilen += bytes(farbe)
+        teil = lambda art, inhalt: struct.pack(">I", len(inhalt)) + art + inhalt + struct.pack(">I", zlib.crc32(art + inhalt))
+        (ordner / f"landschaft-{nr + 1}.png").write_bytes(b"\x89PNG\r\n\x1a\n" + teil(b"IHDR", struct.pack(">IIBBBBB", b, h, 8, 2, 0, 0, 0))
+                                                       + teil(b"IDAT", zlib.compress(bytes(zeilen), 9)) + teil(b"IEND", b""))
+    return ordner
+
+
 # ---------- Notiz-Assistent ----------
 def _eintraege():
     roh = [
@@ -335,7 +359,7 @@ async def main():
     (daten / "seiten" / "blueprint.html").write_text(PLAN, encoding="utf-8")
     _yamtrack(daten / "yamtrack.sqlite3")
     nd, ha, pl = await _starten(NOTIZDIENST), await _starten(HOMEASSISTANT), await _starten(PAPERLESS)
-    app = server.app_bauen(laden({"HOMIE_DATA": str(daten), "HOMIE_DOCKER_LESEN": "0", "HOMIE_BIND": "127.0.0.1", "HOMIE_PORT": str(PORT), "HOMIE_YAMTRACK_DB": str(daten / "yamtrack.sqlite3")}),
+    app = server.app_bauen(laden({"HOMIE_DATA": str(daten), "HOMIE_DOCKER_LESEN": "0", "HOMIE_BIND": "127.0.0.1", "HOMIE_PORT": str(PORT), "HOMIE_YAMTRACK_DB": str(daten / "yamtrack.sqlite3"), "HOMIE_BILDER": str(_bilder(daten / "bilder"))}),
                            erkundung_ziele=[])
     db, ablage = app[server.K_DB], app[server.K_ABLAGE]
     app[server.K_ANM].konto_anlegen(KENNWORT)
