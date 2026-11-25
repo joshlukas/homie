@@ -16,7 +16,7 @@ import jinja2
 from aiohttp import web
 from yarl import URL
 
-from . import agenten, assistent, ausfuehren, bildtag, dokumente, gesundheit, katalog, meintag, module, plaene, proxmox, verbinden, yamtrack
+from . import agenten, assistent, ausfuehren, bildtag, dokumente, gesundheit, guide, katalog, meintag, module, plaene, proxmox, verbinden, yamtrack
 from .ablage import Ablage
 from .anmeldung import COOKIE, MIN_LAENGE, Anmeldung, passwort_maengel
 from .config import PAKET, VERSION, Einstellungen
@@ -511,10 +511,14 @@ async def api_tag(request: web.Request) -> web.Response:
         tage = int(request.query.get("tage", "7"))
     except ValueError:
         tage = 7
+    tage = max(1, min(tage, 400))
+    # Der Tagesguide vergleicht mit den letzten Wochen; deshalb wird immer mindestens ein Monat geholt,
+    # auch wenn die Seite unten nur einen kürzeren Rückblick zeigt.
     daten = await meintag.schnappschuss(
-        _zugang(app, "assistent", ("token",)), _zugang(app, "homeassistant", ("token",)), tage, _ich(app), app[K_EINST].yamtrack)
+        _zugang(app, "assistent", ("token",)), _zugang(app, "homeassistant", ("token",)), max(tage, 30), _ich(app), app[K_EINST].yamtrack)
     bild, tag = await _bild_heute(app)
-    return web.json_response({**daten, "bild": bildtag.marke(bild, tag) if bild else ""}, dumps=lambda o: json.dumps(o, ensure_ascii=False))
+    return web.json_response({**daten, "tage": tage, "guide": guide.erstellen(daten, dt.datetime.now(zone())), "bild": bildtag.marke(bild, tag) if bild else ""},
+                             dumps=lambda o: json.dumps(o, ensure_ascii=False))
 
 
 async def _bild_heute(app: web.Application):

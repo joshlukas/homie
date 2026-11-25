@@ -15,269 +15,144 @@ function card(title, color, rows, opts = {}) {
 const row = (e, extra = "") => `<li>${esc(e.text)}${extra}${e.daten && e.daten.cospend ? `<div class="antwort">Cospend: ${esc(e.daten.cospend)}</div>` : ""}<small>${fmtTime(e.zeit)}</small></li>`;
 
 function render(d) {
-  const E = d.eintraege || [], by = (t) => E.filter((e) => e.typ === t), t0 = today();
+  const t0 = today(), nf = (n, digits = 0) => n.toLocaleString("de-DE", {maximumFractionDigits: digits});
   $("#errors").innerHTML = (d.fehler || []).map((f) => `<p class="err">${esc(f)}</p>`).join("");
-  const aufnahmen = by("aufnahme"), aufgaben = by("aufgabe"), essen = by("essen"), einkauf = by("einkauf"), sport = by("sport");
-  const geld = [...essen, ...einkauf].reduce((s, e) => s + (e.daten.betrag_eur || 0), 0);
-  const minuten = sport.reduce((s, e) => s + (e.daten.dauer_min || 0), 0), km = sport.reduce((s, e) => s + (e.daten.distanz_km || 0), 0);
-  $("#sub").textContent = `${aufnahmen.length} Aufnahmen und Fotos · ${d.tage === 1 ? "heute" : "letzte " + d.tage + " Tage"}`;
-  const nf = (n, digits = 0) => n.toLocaleString("de-DE", {maximumFractionDigits: digits});
-  const cards = [];
-  const C = d.claude;
-  if (C) {
-    const usd = (v) => nf(v, 2) + " $", max = Math.max(...C.tage.map((t) => t.usd), 0.01);
-    const balken = C.tage.map((t) => `<span title="${fmtDay(t.tag)}: ${nf(t.usd, 2)} $, ${t.aufrufe} Aufrufe" style="flex:1;align-self:flex-end;min-height:2px;height:${Math.round(t.usd / max * 100)}%;background:var(--accent);border-radius:3px 3px 0 0;opacity:${t.tag === C.heute.tag ? 1 : .55}"></span>`).join("");
-    const modelle = Object.entries(C.modelle_30_tage || {}).sort((a, b) => b[1].usd - a[1].usd);
-    const voll = C.heute.usd >= C.tageslimit;
-    cards.push(card("Claude-Guthaben", "var(--accent)", [
-      `<li>Guthaben, errechnet<span class="tag">${C.guthaben == null ? "kein Ausgangswert" : usd(C.guthaben)}</span><small>${C.anker ? "Console zeigte " + usd(C.anker.guthaben) + " am " + fmtDay(C.anker.stand.slice(0, 10)) + "; seitdem gezählte Kosten abgezogen" : ""}</small></li>`,
-      `<li>Heute ausgegeben<span class="tag${voll ? " late" : ""}">${usd(C.heute.usd)} von ${usd(C.tageslimit)}</span><small>${C.heute.aufrufe} Aufrufe${voll ? " · Tageslimit erreicht, Claude pausiert bis morgen" : ""}</small></li>`,
-      `<li>Insgesamt seit Beginn<span class="tag">${usd(C.gesamt.usd)}</span><small>${C.gesamt.aufrufe} Aufrufe</small></li>`,
-      ...modelle.map(([m, w]) => `<li>${esc(m)}<span class="tag">${usd(w.usd)}</span><small>${w.aufrufe} Aufrufe in 30 Tagen</small></li>`),
-    ], {note: C.aktiv ? "geschätzt aus der Nutzung" : "Claude ist abgeschaltet",
-        extra: `<div style="display:flex;gap:3px;height:54px;margin:4px 0 10px" aria-label="Kosten der letzten 14 Tage">${balken}</div>`}));
+  // Der Guide rechnet immer mit einem Monat; der Rückblick unten zeigt nur den gewählten Zeitraum.
+  const ab = new Date(); ab.setDate(ab.getDate() - (d.tage - 1));
+  const abIso = ab.toLocaleDateString("sv-SE"), E = (d.eintraege || []).filter((e) => (e.tag || "") >= abIso), by = (t) => E.filter((e) => e.typ === t);
+  const stark = (s) => esc(s).replace(/\[\[(.+?)\]\]/g, "<b>$1</b>");
+  const farbe = {kritisch: "var(--bad)", achtung: "var(--warn)", gut: "var(--good)", info: "var(--sky)", "": "var(--none)"};
+  const G = d.guide || {hinweise: [], agenda: [], ampeln: [], ruhig: [], kopf: ""};
+
+  // ---------- Kopf: Datum, ein Satz zum Tag, je Bereich eine Ampel ----------
+  $("#sub").textContent = new Date().toLocaleDateString("de-DE", {weekday: "long", day: "numeric", month: "long"});
+  $("#gsatz").textContent = G.kopf || "Noch nichts verbunden, aus dem sich der Tag ablesen ließe.";
+  $("#ampeln").innerHTML = G.ampeln.map((a) => `<a class="ampel" href="#${esc(a.ziel)}" data-ziel="${esc(a.ziel)}" style="--t:${farbe[a.ton] || farbe[""]}"><span><i></i>${esc(a.bereich)}</span><b>${esc(a.wert)}</b><small>${esc(a.text)}</small></a>`).join("");
+  const bt = $("#bildtag"), adr = d.bild ? "/api/bild-des-tages?v=" + encodeURIComponent(d.bild) : "";
+  if (bt && bt.dataset.v !== adr) {
+    bt.dataset.v = adr; bt.hidden = !adr; $("#guide").classList.toggle("mitbild", !!adr);
+    if (adr) { const im = bt.querySelector("img"); im.onerror = () => { bt.hidden = true; $("#guide").classList.remove("mitbild"); }; im.src = adr; bt.href = adr; }
   }
-  const P = d.profil;
+
+  // ---------- Was heute zählt: Schlüsse statt Einzelwerte ----------
+  const satz = (h) => `<li style="--t:${farbe[h.ton] || farbe.info}"${h.ziel ? ` data-ziel="${esc(h.ziel)}" tabindex="0" role="link"` : ""}><i></i><span><em>${esc(h.bereich)}</em>${stark(h.text)}</span></li>`;
+  const oben = G.hinweise.slice(0, 7), mehr = G.hinweise.slice(7);
+  $("#hinweise").innerHTML = `<h2><i></i>Was heute zählt</h2>` + (oben.length ? `<ul class="saetze">${oben.map(satz).join("")}</ul>` : `<p class="empty">Keine Auffälligkeiten.</p>`)
+    + (mehr.length ? `<details class="rest"><summary>${mehr.length} weitere ${mehr.length === 1 ? "Hinweis" : "Hinweise"}</summary><ul class="saetze">${mehr.map(satz).join("")}</ul></details>` : "")
+    + (G.ruhig.length ? `<p class="ruhig">Geprüft und unauffällig: ${esc(G.ruhig.join(", "))}.</p>` : "");
+
+  // ---------- Agenda: Termine, Aufgaben, Erinnerungen und fällige Posten in einer Liste ----------
+  const morgen = new Date(); morgen.setDate(morgen.getDate() + 1);
+  const tagName = (iso) => !iso ? "Ohne festen Tag" : iso === t0 ? "Heute" : iso === morgen.toLocaleDateString("sv-SE") ? "Morgen" : new Date(iso + "T12:00").toLocaleDateString("de-DE", {weekday: "long", day: "numeric", month: "numeric"});
+  const punkt = {termin: "var(--sky)", aufgabe: "var(--accent)", vorschlag: "var(--warn)", erinnerung: "var(--pink)", posten: "var(--teal)"};
+  const jeTag = [];
+  G.agenda.forEach((a) => { const l = jeTag[jeTag.length - 1]; if (l && l.tag === a.tag) l.punkte.push(a); else jeTag.push({tag: a.tag, punkte: [a]}); });
+  const aTag = (g) => `<h3 class="atag${g.tag === t0 ? " heute" : ""}">${esc(tagName(g.tag))}</h3><ul class="apunkte">${g.punkte.map((a) =>
+    `<li class="${a.dringend ? "dringend" : ""}" style="--t:${punkt[a.art] || "var(--none)"}"><time>${esc(a.wann || "")}</time><i></i><span>${esc(a.titel)}${a.zusatz ? `<small>${esc(a.zusatz)}</small>` : ""}</span></li>`).join("")}</ul>`;
+  // sichtbar bleiben etwa acht Punkte; ganze Tage wandern dahinter, damit die Karte kurz bleibt
+  let zahl = 0; const vorn = [], hinten = [];
+  jeTag.forEach((g) => { (zahl && zahl + g.punkte.length > 8 ? hinten : vorn).push(g); zahl += g.punkte.length; });
+  const spaeter = hinten.reduce((s, g) => s + g.punkte.length, 0);
+  $("#agenda").innerHTML = `<h2><i></i>Die nächsten Tage</h2>` + (jeTag.length ? vorn.map(aTag).join("") + (hinten.length ? `<details class="rest"><summary>${spaeter} weitere ${spaeter === 1 ? "Punkt" : "Punkte"}</summary>${hinten.map(aTag).join("")}</details>` : "")
+    : `<p class="empty">Nichts in den nächsten sieben Tagen.</p>`);
+
+  // ---------- Zu entscheiden: alles, was auf ein Ja oder Nein wartet ----------
+  const ent = [], eur = (v) => v.toLocaleString("de-DE", {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " €", eur0 = (v) => nf(Math.round(v), 0) + " €";
+  const P = d.profil, F = d.finanzen, g = d.gesundheit;
   if (P && P.vorschlaege && P.vorschlaege.length) {
     const wort = {ergaenzen: "neu", ersetzen: "ändern", streichen: "streichen"};
-    cards.push(card("Über mich – Vorschläge", "var(--pink)", P.vorschlaege.map((v) =>
+    ent.push(card("Über mich – Vorschläge", "var(--pink)", P.vorschlaege.map((v) =>
       `<li><span class="tag">${esc(v.abschnitt)} · ${wort[v.art] || esc(v.art)}</span>
         <div style="margin-top:6px">${v.art === "streichen" ? "<s>" + esc(v.alt) + "</s>" : esc(v.neu)}</div>
         ${v.art === "ersetzen" && v.alt ? `<div class="antwort">bisher: ${esc(v.alt)}</div>` : ""}
         <small>${esc(v.begruendung)}</small>
         <div class="knoepfe"><button data-profil="${v.id}" data-ja="1">Annehmen</button><button data-profil="${v.id}" data-ja="0">Ablehnen</button></div></li>`),
-      {wide: true, note: "gilt erst, wenn du annimmst"}));
+      {note: "gilt erst, wenn du annimmst"}));
   }
-  const G = d.cospend;
-  if (G) {
-    const eur = (v) => nf(v, 2) + " €", ichName = d.ich && d.ich in G.saldo ? d.ich : null, ich = ichName ? G.saldo[ichName] : 0,
-      anderer = Object.keys(G.saldo).find((n) => n !== ichName) || "die andere Person";
-    const kat = Object.entries(G.zeitraum.nach_kategorie), kmax = Math.max(...kat.map((k) => k[1]), 1);
-    const mon = Object.entries(G.monate), mmax = Math.max(...mon.map((m) => m[1]), 1);
-    cards.push(card("Gemeinsame Ausgaben (Cospend)", "var(--teal)", [
-      `<li>Stand zwischen euch<span class="tag${ich < -0.005 ? " late" : ""}">${Math.abs(ich) < 0.005 ? "ausgeglichen" : !ichName ? Object.entries(G.saldo).map(([n, v]) => esc(n) + " " + (v < 0 ? "−" : "+") + eur(Math.abs(v))).join(" · ") : ich < 0 ? "du schuldest " + esc(anderer) + " " + eur(-ich) : esc(anderer) + " schuldet dir " + eur(ich)}</span></li>`,
-      `<li>Dieser Monat<span class="tag">${eur(G.monat.summe)}</span><small>${mon.map(([m, v]) => m.slice(5) + "/" + m.slice(2, 4) + ": " + nf(v, 0) + " €").join(" · ")}</small></li>`,
-      `<li>Im gewählten Zeitraum<span class="tag">${eur(G.zeitraum.summe)}</span><small>${G.zeitraum.anzahl} Einträge</small>
-        ${kat.slice(0, 7).map(([k, v]) => `<div style="display:flex;align-items:center;gap:8px;margin-top:5px;font-size:13px"><span style="flex:0 0 38%;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(k)}</span><span style="flex:1;height:8px;border-radius:4px;background:var(--border)"><span style="display:block;height:8px;border-radius:4px;width:${Math.max(2, Math.round(v / kmax * 100))}%;background:var(--teal)"></span></span><span style="flex:0 0 auto;font-variant-numeric:tabular-nums">${nf(v, 0)} €</span></div>`).join("")}</li>`,
-      ...G.letzte.slice(0, 6).map((b) => `<li>${esc(b.was.trim())}<span class="tag">${eur(b.betrag)}</span>${b.sprachnotiz ? '<span class="tag">per Sprachnotiz</span>' : ""}<small>${fmtDay(b.tag)} · ${esc(b.zahler)} zahlt${b.kategorie ? " · " + esc(b.kategorie) : ""}</small></li>`),
-    ], {note: G.projekt}));
-  }
-  const F = d.finanzen;
+  const TV = (g && g.training_vorschlaege) || [];
+  if (TV.length) ent.push(card("Training erkannt?", "var(--good)", TV.map((v) => `<li class="konto"><div><b>${fmtDay(v.tag)} · ${v.von} bis ${v.bis} Uhr</b><small>etwa ${v.dauer_min} Minuten · ${nf(v.schritte)} Schritte</small><div class="knoepfe"><button data-training="${esc(v.id)}" data-ja="1">Als Training eintragen</button><button data-training="${esc(v.id)}" data-ja="0">War keins</button></div></div></li>`),
+    {note: "aus den Schritten des Bands"}));
+  const O = F && F.cospend_offen;
+  if (O && O.liste && O.liste.length) ent.push(card("In die gemeinsame Abrechnung?", "var(--teal)", O.liste.map((u) => `<li class="konto"><div><b>${esc(u.name)}</b><small>${fmtDay(u.tag)} · ${esc(u.wer)}</small><div class="knoepfe"><button data-finanz="${u.id}" data-ja="1">Eintragen</button><button data-finanz="${u.id}" data-ja="0">Übergehen</button></div></div><span class="betrag">${eur(u.betrag)}</span></li>`),
+    {note: O.anzahl + " Kartenkäufe · " + eur(O.summe)}));
+  else if (O && O.fehler) ent.push(card("In die gemeinsame Abrechnung?", "var(--teal)", [`<li>Abgleich nicht möglich<small>${esc(O.fehler)}</small></li>`]));
+  $("#entscheiden").innerHTML = ent.length ? `<h3 class="gruppe"><span>Zu entscheiden</span></h3><div class="grid">${ent.join("")}</div>` : "";
+
+  // ---------- Details, eingeklappt: nur was die Seiten Finanzen, Gesundheit und Assistent nicht schon zeigen ----------
+  const geldK = [], koerperK = [], notiertK = [];
   if (F && F.konten && F.konten.length) {
-    const eur = (v) => nf(v, 2) + " €", eur0 = (v) => nf(Math.round(v), 0) + " €", B = F.budget, V = F.verlauf, PR = F.prognose;
-    const farbe = {gruen: "var(--good)", gelb: "var(--warn)", rot: "var(--bad)"};
-    const mName = (m) => new Date(m + "-15").toLocaleDateString("de-DE", {month: "short"}).replace(".", "");
+    const B = F.budget, V = F.verlauf, PR = F.prognose, ampel = {gruen: "var(--good)", gelb: "var(--warn)", rot: "var(--bad)"};
     if (B) {
       const wort = {gruen: "im Rahmen", gelb: "etwas schneller als üblich", rot: B.frei < 0 ? "Monat überzogen" : "deutlich schneller als üblich"};
       const aus = B.ausgegeben, raum = B.spielraum, nochK = PR ? Math.max(PR.ausgaben - aus, 0) : 0;
       const kommt = Math.max(0, Math.min(nochK, raum - aus)), rest = Math.max(PR ? PR.frei : B.frei, 0);
-      const satz = B.frei < 0 ? `Du liegst diesen Monat <b class="minus">${eur0(-B.frei)}</b> über deinem Spielraum.` : `Du kannst diesen Monat noch <b>${eur0(B.frei)}</b> ausgeben.`;
-      const satz2 = !PR ? "" : PR.frei < 0 ? `Läuft der Rest des Monats wie üblich, fehlen am Ende etwa <b class="minus">${eur0(-PR.frei)}</b>.` : `Läuft der Rest des Monats wie üblich, bleiben am Ende etwa <b class="plus">${eur0(PR.frei)}</b> übrig.`;
-      const fakten = [
-        ["Pro Tag verfügbar", B.frei > 0 ? eur0(B.je_tag) : "0 €", "für die restlichen " + B.rest_tage + " Tage", ""],
-        PR && PR.giro_ende != null ? ["Girokonto am Monatsende", "etwa " + eur0(PR.giro_ende), PR.offen_fix > 0 ? "nach " + eur0(PR.offen_fix) + " festen Posten, die noch abgehen" : "alle festen Posten sind gebucht", PR.giro_ende < 0 ? "minus" : ""] : null,
-        B.sonder > 0 ? ["Sondereingänge", "+" + eur0(B.sonder), "kommen obendrauf, hier nicht eingerechnet", "plus"] : null].filter(Boolean);
       window.__verlauf = V ? {V, B, PR} : null;
-      cards.push(`<article class="card wide held" style="--c:var(--accent)"><h2><i></i>Noch frei diesen Monat<em><span class="punkt" style="background:${farbe[B.ampel]}"></span>${wort[B.ampel]}</em></h2>
-        <p class="satz">${satz}</p>${satz2 ? `<p class="satz2">${satz2}</p>` : ""}
+      geldK.push(`<article class="card wide held" style="--c:var(--accent)"><h2><i></i>Monatsverlauf<em><span class="punkt" style="background:${ampel[B.ampel]}"></span>${wort[B.ampel]}</em></h2>
         <div class="budget" role="img" aria-label="Vom Spielraum ${eur0(raum)} sind ${eur0(aus)} ausgegeben">
           <i class="b-aus${aus > raum ? " ueber" : ""}" style="flex:${Math.max(aus, 1)}"></i>${kommt > 0 ? `<i class="b-kommt" style="flex:${kommt}"></i>` : ""}${rest > 0 ? `<i class="b-rest" style="flex:${rest}"></i>` : ""}</div>
         <div class="budgetleg"><span><i class="b-aus"></i><b>${eur0(aus)}</b> ausgegeben</span>${PR ? `<span><i class="b-kommt"></i><b>etwa ${eur0(nochK)}</b> kommen erfahrungsgemäß noch</span>` : ""}<span><i class="b-rest"></i><b>${PR ? "etwa " : ""}${eur0(rest)}</b> bleiben übrig</span><span class="rechts">Spielraum im Monat: <b>${eur0(raum)}</b></span></div>
-        <div class="minis">${fakten.map(([l, z, t, k]) => `<div class="mini ${k}"><span>${esc(l)}</span><b>${z}</b><small>${esc(t)}</small></div>`).join("")}</div>
-        ${V ? `<h3 class="charttitel">Ausgaben im Monatsverlauf<small>aufaddiert vom 1. bis heute, gestrichelt die Prognose</small></h3><div class="chart" id="verlauf"></div>
+        ${V ? `<div class="chart" id="verlauf"></div>
         <div class="legende"><span><i style="background:linear-gradient(90deg,#7c6cff,#ff5fa2)"></i>dieser Monat</span><span><i class="strich"></i>Prognose bis Monatsende</span><span><i class="punkte"></i>so lief es im Mittel der letzten Monate</span><span><i class="raum"></i>Spielraum</span></div>` : ""}
         <details><summary>So wird gerechnet</summary><p>Spielraum = regelmäßige Einnahmen ${eur(B.einnahmen)} − feste Ausgaben ${eur(B.fix)} = ${eur(raum)}. Davon ab geht, was diesen Monat mit Karte und vom Girokonto variabel ausgegeben wurde. Die Prognose nimmt an, dass der Rest des Monats so verläuft wie im Mittel der letzten Monate.</p></details></article>`);
-    } else if (F.hinweis) cards.push(card("Noch frei diesen Monat", "var(--accent)", [`<li>${esc(F.hinweis)}</li>`]));
-
-    cards.push(card("Konten", "var(--sky)", F.konten.map((k) => `<li class="konto"><div><b>${esc(k.name)}</b><small>${esc(k.bank)} · Stand ${fmtDay(k.stand)}</small></div><span class="betrag${k.saldo < 0 ? " minus" : ""}">${k.saldo == null ? "–" : eur(k.saldo)}</span></li>`)));
-
-    const BI = Object.entries(F.bilanz || {});
-    if (BI.length) {
-      const bmax = Math.max(...BI.flatMap(([m, z]) => [z.ein, z.aus]), 1);
-      cards.push(card("Monatsbilanz", "var(--teal)", [], {note: "Einnahmen gegen Ausgaben", empty: " ",
-        extra: `<div class="saeulen">${BI.map(([m, z]) => `<div class="saeule${m === F.monat ? " jetzt" : ""}"><div class="paar"><i class="ein" style="height:${Math.max(2, z.ein / bmax * 100)}%" title="Einnahmen ${eur(z.ein)}"></i><i class="aus" style="height:${Math.max(2, z.aus / bmax * 100)}%" title="Ausgaben ${eur(z.aus)}"></i></div><span>${mName(m)}</span><b class="${z.netto < 0 ? "minus" : "plus"}">${z.netto < 0 ? "−" : "+"}${nf(Math.abs(Math.round(z.netto)), 0)}</b></div>`).join("")}</div>
-          <div class="legende"><span><i style="background:var(--g-teal)"></i>Einnahmen</span><span><i style="background:var(--g-pink)"></i>Ausgaben</span><span>Zahl darunter: was übrig blieb · ${mName(F.monat)} läuft noch</span></div>`}));
-    }
-
+    } else if (F.hinweis) geldK.push(card("Monatsverlauf", "var(--accent)", [`<li>${esc(F.hinweis)}</li>`]));
     const KK = F.karte || {};
     if (KK.vorhanden && KK.kategorien && KK.kategorien.length) {
       const kat = [...KK.kategorien].sort((a, b) => b.monat - a.monat), kmax = Math.max(...kat.flatMap((k) => [k.monat, k.schnitt]), 1);
-      cards.push(card("Kreditkarte nach Kategorie", "var(--pink)", [], {note: eur0(KK.monat) + " diesen Monat", empty: " ",
+      geldK.push(card("Kreditkarte nach Kategorie", "var(--pink)", [], {note: eur0(KK.monat) + " diesen Monat", empty: " ",
         extra: `<div class="kat">${kat.map((k) => { const mehr = k.monat > k.schnitt * 1.1 && k.monat - k.schnitt > 10; return `<div class="katzeile"><span class="katname">${esc(k.name)}</span><span class="spur"><i class="${mehr ? "mehr" : ""}" style="width:${Math.max(1.5, k.monat / kmax * 100)}%"></i><u style="left:${k.schnitt / kmax * 100}%" title="Schnitt ${eur0(k.schnitt)}"></u></span><span class="katwert"><b>${eur0(k.monat)}</b><small>Ø ${eur0(k.schnitt)}</small></span></div>`; }).join("")}</div>
           <div class="legende"><span><i style="background:var(--g-violet)"></i>dieser Monat</span><span><i style="background:var(--g-pink)"></i>über dem Schnitt</span><span><i class="marke"></i>Schnitt der letzten Monate</span></div>`}));
     }
-
-    if (PR && PR.posten && PR.posten.length) {
-      cards.push(card("Feste Posten", "var(--warn)", PR.posten.map((x) => `<li class="konto"><div><b>${esc(x.wer.slice(0, 34))}</b><small>${x.offen ? "steht noch aus" + (x.tag ? " · meist um den " + x.tag + "." : "") : "diesen Monat gebucht"}</small></div><span class="betrag ${x.betrag > 0 ? "plus" : ""}">${x.betrag > 0 ? "+" : "−"}${eur0(Math.abs(x.offen || x.betrag))}</span><span class="tag${x.offen ? " late" : " today"}">${x.offen ? "offen" : "✓"}</span></li>`),
-        {note: PR.offen_fix > 0 ? "noch " + eur0(PR.offen_fix) + " offen" : "alles gebucht"}));
+    if (F.tipps && F.tipps.length) {
+      geldK.push(card("Sparpotenzial", "var(--lime)", F.tipps.map((t) => `<li class="konto"><div><b>${esc(t.name)}</b><small>Ø ${eur0(t.schnitt)} im Monat bei ${nf(t.kaeufe, 0)} Käufen · ${t.anteil} % weniger</small></div><span class="betrag plus">+${nf(t.ersparnis, 0)} €</span></li>`),
+        {note: "zusammen etwa " + nf(F.tipps.reduce((s, t) => s + t.ersparnis, 0), 0) + " € im Monat"}));
     }
-
-    if ((F.tipps && F.tipps.length) || (F.abos && F.abos.length)) {
-      cards.push(card("Sparpotenzial", "var(--lime)", [
-        ...(F.tipps || []).map((t) => `<li class="konto"><div><b>${esc(t.name)}</b><small>Ø ${eur0(t.schnitt)} im Monat bei ${nf(t.kaeufe, 0)} Käufen · ${t.anteil} % weniger</small></div><span class="betrag plus">+${nf(t.ersparnis, 0)} €</span></li>`),
-        ...(F.abos && F.abos.length ? [`<li><b>Laufende Abos</b><div class="chips">${F.abos.map((a) => `<span class="tag">${esc(a.wer)} ${nf(a.je_monat, 2)} €</span>`).join("")}</div></li>`] : []),
-      ], {note: (F.tipps || []).length ? "zusammen etwa " + nf(F.tipps.reduce((s, t) => s + t.ersparnis, 0), 0) + " € im Monat" : ""}));
-    }
-
-    const O = F.cospend_offen;
-    if (O && O.liste && O.liste.length) {
-      cards.push(card("In Cospend nachtragen?", "var(--teal)", O.liste.map((u) => `<li class="konto"><div><b>${esc(u.name)}</b><small>${fmtDay(u.tag)} · ${esc(u.wer)}</small><div class="knoepfe"><button data-finanz="${u.id}" data-ja="1">Eintragen</button><button data-finanz="${u.id}" data-ja="0">Übergehen</button></div></div><span class="betrag">${eur(u.betrag)}</span></li>`),
-        {note: O.anzahl + " Kartenkäufe · " + eur(O.summe)}));
-    } else if (O && !O.fehler) cards.push(card("In Cospend nachtragen?", "var(--teal)", [`<li class="konto"><div><b>Alles nachgetragen</b><small>Jeder Kartenkauf für den Haushalt der letzten 35 Tage hat einen Eintrag in der Verrechnungsliste.</small></div><span class="tag today">✓</span></li>`]));
-    else if (O && O.fehler) cards.push(card("In Cospend nachtragen?", "var(--teal)", [`<li>Abgleich nicht möglich<small>${esc(O.fehler)}</small></li>`]));
-
-    cards.push(card("Letzte Umsätze", "var(--sky)", F.letzte.slice(0, 8).map((u) => `<li class="konto"><div><b>${esc(u.wer.slice(0, 40))}</b><small>${fmtDay(u.tag)} · ${esc(u.konto)}</small></div><span class="betrag ${u.betrag > 0 ? "plus" : ""}">${u.betrag > 0 ? "+" : "−"}${eur(Math.abs(u.betrag))}</span></li>`)));
   }
-  cards.push(card("Aufgaben", "var(--accent)", aufgaben.map((e) => {
-    const f = e.daten.faellig;
-    return row(e, f ? `<span class="tag${f < t0 ? " late" : ""}">bis ${fmtDay(f)}</span>` : "");
-  }), {empty: "Keine Aufgaben erkannt."}));
-  const K = d.kalender;
-  if (K) {
-    const dayOf = (x) => (x.beginn || "").slice(0, 10), tm = (x) => new Date(x).toLocaleTimeString("de-DE", {hour: "2-digit", minute: "2-digit"});
-    cards.push(card("Kalender", "var(--sky)", K.termine.map((x) => {
-      const when = x.ganztags ? "ganztägig" : tm(x.beginn) + (x.ende ? "–" + tm(x.ende) : "");
-      return `<li>${esc(x.titel)}<span class="tag${dayOf(x) === t0 ? " today" : ""}">${dayOf(x) === t0 ? "heute" : fmtDay(dayOf(x))}</span><small>${when}${x.ort ? " · " + esc(x.ort) : ""}${K.kalender.length > 1 ? " · " + esc(x.kalender) : ""}</small></li>`;
-    }), {wide: true, cls: "kal", note: `nächste ${K.tage} Tage`, empty: K.kalender.length ? "Keine Termine in den nächsten Tagen." : "In Home Assistant ist noch kein Kalender eingerichtet."}));
-  }
-  cards.push(card("Termine (Vorschläge)", "var(--sky)", by("termin").sort((a, b) => (a.daten.datum || "").localeCompare(b.daten.datum || "")).map((e) =>
-    row(e, `<span class="tag">${e.daten.datum ? fmtDay(e.daten.datum) : "ohne Datum"}${e.daten.uhrzeit ? " · " + esc(e.daten.uhrzeit) : ""}</span>${e.daten.ort ? `<span class="tag">${esc(e.daten.ort)}</span>` : ""}`)),
-    {empty: "Keine Termine erkannt.", note: "noch nicht im Kalender"}));
-  cards.push(card("Erinnerungen", "var(--warn)", by("erinnerung").map((e) => row(e))));
-
-  // Ausgaben pro Tag als kleine Balken
-  const perDay = {};
-  [...essen, ...einkauf].forEach((e) => { perDay[e.tag] = (perDay[e.tag] || 0) + (e.daten.betrag_eur || 0); });
-  const dayList = [...Array(Math.min(d.tage, 14))].map((_, i) => { const x = new Date(); x.setDate(x.getDate() - i); return x.toLocaleDateString("sv-SE"); }).reverse();
-  const max = Math.max(1, ...dayList.map((k) => perDay[k] || 0));
-  const bars = d.tage > 1 ? `<div class="barwrap"><div class="bars" role="img" aria-label="Ausgaben pro Tag">${dayList.map((k) =>
-    `<div style="height:${Math.round(100 * (perDay[k] || 0) / max)}%" title="${fmtDay(k)}: ${eur(perDay[k] || 0)}"><span>${k.slice(8)}</span></div>`).join("")}</div></div>` : "";
-  const money = (e) => (e.daten.betrag_eur != null ? `<span class="tag">${eur(e.daten.betrag_eur)}</span>` : "");
-  cards.push(card("Essen und Trinken", "var(--lime)", essen.map((e) => row(e, money(e))), {extra: bars, note: geld ? eur(geld) + " gesamt" : ""}));
-  cards.push(card("Einkäufe und Ausgaben", "var(--teal)", einkauf.map((e) => row(e, money(e)))));
-  const lab = (x, i, n) => (n <= 14 || (n - 1 - i) % (n <= 31 ? 7 : 14) === 0 ? `<span>${x.tag.slice(8)}.${n > 31 ? x.tag.slice(5, 7) + "." : ""}</span>` : "");
-  const g = d.gesundheit;
-  let health = "";
   if (g) {
-    const a = g.aktuell, alt = (k) => (a[k].stand && new Date(a[k].stand).toLocaleDateString("sv-SE") !== t0 ? " · " + fmtDay(new Date(a[k].stand).toLocaleDateString("sv-SE")) : ""),
-      stat = (k, label, f, mitTag) => (a[k] ? `<div class="hstat"><b>${f(a[k].wert)}</b><span>${label}${mitTag ? alt(k) : ""}</span></div>` : "");
-    const maxS = Math.max(1, ...g.tage.map((x) => x.schritte || 0));
-    health = `<div class="hstats">${stat("schritte", "Schritte heute", (v) => nf(v))}${stat("distanz_m", "km heute", (v) => nf(v / 1000, 1))}${stat("kalorien_aktiv", "kcal aktiv", (v) => nf(v))}${stat("puls", "Puls", (v) => nf(v), true)}${stat("ruhepuls", "Ruhepuls", (v) => nf(v), true)}${stat("sauerstoff", "% Sauerstoff", (v) => nf(v), true)}</div>`
-      + `<div class="barwrap"><div class="bars good" role="img" aria-label="Schritte pro Tag">${g.tage.map((x, i) =>
-        `<div style="height:${Math.round(100 * (x.schritte || 0) / maxS)}%" title="${fmtDay(x.tag)}: ${nf(x.schritte || 0)} Schritte${x.distanz_m ? ", " + nf(x.distanz_m / 1000, 1) + " km" : ""}">${lab(x, i, g.tage.length)}</div>`).join("")}</div></div>`
-      + `<p class="avg">Schnitt ${nf(g.tage.reduce((s, x) => s + (x.schritte || 0), 0) / Math.max(1, g.tage.filter((x) => x.schritte).length))} Schritte an ${g.tage.filter((x) => x.schritte).length} Tagen mit Daten</p>`;
-  }
-  cards.push(card("Sport und Bewegung", "var(--good)", sport.map((e) => row(e,
-    (e.daten.dauer_min ? `<span class="tag">${e.daten.dauer_min} min</span>` : "") + (e.daten.distanz_km ? `<span class="tag">${e.daten.distanz_km} km</span>` : ""))),
-    {extra: health, note: g ? "Health Connect" : "", empty: g ? "Kein Training eingesprochen." : "Nichts eingesprochen. Die Werte vom Handy fehlen noch (Zugriffstoken für Home Assistant)."}));
-
-  if (g) {
-    const TV = g.training_vorschlaege || [];
-    if (TV.length) cards.push(card("Training erkannt?", "var(--good)", TV.map((v) => `<li class="konto"><div><b>${fmtDay(v.tag)} · ${v.von} bis ${v.bis} Uhr</b><small>etwa ${v.dauer_min} Minuten · ${nf(v.schritte)} Schritte · rund ${v.tempo} pro Minute</small><div class="knoepfe"><button data-training="${esc(v.id)}" data-ja="1">Als Training eintragen</button><button data-training="${esc(v.id)}" data-ja="0">War keins</button></div></div></li>`),
-      {note: "aus den Schritten des Bands"}));
     window.__tr = {alle: g.training_alle || g.training || [], ab: g.daten_ab, stand: g.export_stand, monat: (window.__tr && window.__tr.monat) || null};
-    if (window.__tr.alle.length) cards.push(`<article class="card wide trkarte" style="--c:var(--good)"><h2><i></i>Training${g.export_stand ? `<em>Export bis ${esc(fmtDay(g.export_stand))}</em>` : ""}</h2><div id="trkal"></div></article>`);
-    const nights = g.tage.filter((x) => x.schlaf_min), maxN = Math.max(1, ...g.tage.map((x) => x.schlaf_min || 0));
-    cards.push(card("Schlaf", "var(--accent)", nights.slice(-7).reverse().map((x) =>
-      `<li>${Math.floor(x.schlaf_min / 60)} h ${String(x.schlaf_min % 60).padStart(2, "0")} min<small>${fmtDay(x.tag)}</small></li>`),
-      {extra: nights.length > 1 ? `<div class="barwrap"><div class="bars" role="img" aria-label="Schlaf pro Nacht">${g.tage.map((x, i) =>
-        `<div style="height:${Math.round(100 * (x.schlaf_min || 0) / maxN)}%" title="${fmtDay(x.tag)}: ${x.schlaf_min ? nf(x.schlaf_min / 60, 1) + " h" : "keine Daten"}">${lab(x, i, g.tage.length)}</div>`).join("")}</div></div>` : "",
-       empty: "Keine Schlafdaten im gewählten Zeitraum."}));
+    if (window.__tr.alle.length) koerperK.push(`<article class="card wide trkarte" style="--c:var(--good)"><h2><i></i>Training${g.export_stand ? `<em>Export bis ${esc(fmtDay(g.export_stand))}</em>` : ""}</h2><div id="trkal"></div></article>`);
+  }
+  // Notiert: ein Verlauf statt einer Karte je Art
+  const artName = {essen: "Essen", einkauf: "Einkauf", sport: "Sport", medien: "Medien", ueberlegung: "Gedanke", notiz: "Notiz", befinden: "Befinden", erinnerung: "Erinnerung", frage: "Frage", fuer_claude: "An Claude", aufgabe: "Aufgabe", termin: "Termin"};
+  const artFarbe = {essen: "var(--lime)", einkauf: "var(--teal)", sport: "var(--good)", medien: "var(--pink)", ueberlegung: "var(--accent)", notiz: "var(--sky)", befinden: "var(--warn)", erinnerung: "var(--warn)", frage: "var(--teal)", fuer_claude: "var(--bad)", aufgabe: "var(--accent)", termin: "var(--sky)"};
+  const feed = E.filter((e) => artName[e.typ]).sort((a, b) => (b.zeit || "").localeCompare(a.zeit || ""));
+  const zusatz = (e) => { const x = e.daten || {}, t = [];
+    if (x.betrag_eur != null) t.push(eur(x.betrag_eur));
+    if (x.dauer_min) t.push(x.dauer_min + " min");
+    if (x.distanz_km) t.push(x.distanz_km + " km");
+    if (x.faellig) t.push("bis " + fmtDay(x.faellig));
+    if (x.datum && e.typ === "termin") t.push(fmtDay(x.datum) + (x.uhrzeit ? " " + x.uhrzeit : ""));
+    if (e.typ === "fuer_claude") t.push(x.status || "offen");
+    const lang = x.antwort ? `<details class="rest"><summary>Antwort${x.modell ? " von " + esc(x.modell) : ""}</summary><p>${esc(x.antwort)}</p></details>` : "";
+    const hinweis = [x.cospend ? "Cospend: " + x.cospend : "", x.yamtrack ? "Yamtrack: " + x.yamtrack : ""].filter(Boolean).map((s) => `<small>${esc(s)}</small>`).join("");
+    return t.map((s) => `<span class="tag">${esc(s)}</span>`).join("") + hinweis + lang; };
+  if (feed.length) {
+    const tage = [];
+    feed.forEach((e) => { const l = tage[tage.length - 1]; if (l && l.tag === e.tag) l.e.push(e); else tage.push({tag: e.tag, e: [e]}); });
+    const geld = feed.filter((e) => e.typ === "essen" || e.typ === "einkauf").reduce((s, e) => s + ((e.daten || {}).betrag_eur || 0), 0);
+    notiertK.push(`<article class="card wide" style="--c:var(--accent)"><h2><i></i>Notiert<em>${feed.length} Einträge${geld ? " · " + eur(geld) + " eingesprochene Ausgaben" : ""}</em></h2>${tage.map((t) =>
+      `<h3 class="atag">${esc(tagName(t.tag))}</h3><ul class="feed">${t.e.map((e) => `<li style="--t:${artFarbe[e.typ]}"><em>${artName[e.typ]}</em><span>${esc(e.text)}${zusatz(e)}</span></li>`).join("")}</ul>`).join("")}</article>`);
   }
   const y = d.yamtrack, img = (b) => (b && /^https:\/\//.test(b) ? `<img src="${esc(b)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : "");
-  const medien = by("medien").map((e) => row(e, (e.daten.titel ? `<span class="tag">${esc(e.daten.titel)}</span>` : "") +
-    (e.daten.yamtrack ? `<div class="antwort">Yamtrack: ${esc(e.daten.yamtrack)}</div>` : "")));
-  cards.push(card("Gesehen, gelesen, gehört (eingesprochen)", "var(--pink)", medien));
-  if (y) {
-    cards.push(card("Schaue gerade (Yamtrack)", "var(--pink)", y.laufend.map((m) => `<li class="media">${img(m.bild)}<div>${esc(m.titel)}</div></li>`), {empty: "Nichts als laufend markiert."}));
-    cards.push(card("Zuletzt gesehen (Yamtrack)", "var(--pink)", [
-      ...y.folgen.slice(0, 8).map((m) => ({z: m.zeit, h: `<li class="media">${img(m.bild)}<div>${esc(m.titel)} <span class="tag">S${m.staffel} · F${m.folge}</span><small>${fmtTime(m.zeit.replace(" ", "T") + "Z")}</small></div></li>`})),
-      ...y.filme.slice(0, 4).map((m) => ({z: m.zeit, h: `<li class="media">${img(m.bild)}<div>${esc(m.titel)} <span class="tag">Film</span><small>${fmtTime(m.zeit.replace(" ", "T") + "Z")}</small></div></li>`})),
-    ].sort((a, b) => b.z.localeCompare(a.z)).slice(0, 10).map((x) => x.h)));
+  if (y && (y.laufend.length || y.folgen.length || y.filme.length)) {
+    notiertK.push(card("Gesehen", "var(--pink)", [
+      ...y.laufend.slice(0, 4).map((m) => ({z: "9", h: `<li class="media">${img(m.bild)}<div>${esc(m.titel)} <span class="tag">läuft</span></div></li>`})),
+      ...y.folgen.slice(0, 6).map((m) => ({z: m.zeit, h: `<li class="media">${img(m.bild)}<div>${esc(m.titel)} <span class="tag">S${m.staffel} · F${m.folge}</span><small>${fmtTime(m.zeit.replace(" ", "T") + "Z")}</small></div></li>`})),
+      ...y.filme.slice(0, 3).map((m) => ({z: m.zeit, h: `<li class="media">${img(m.bild)}<div>${esc(m.titel)} <span class="tag">Film</span><small>${fmtTime(m.zeit.replace(" ", "T") + "Z")}</small></div></li>`})),
+    ].sort((a, b) => b.z.localeCompare(a.z)).slice(0, 9).map((x) => x.h), {note: "aus Yamtrack"}));
   }
-  cards.push(card("Überlegungen", "var(--accent)", by("ueberlegung").map((e) => row(e))));
-  cards.push(card("Notizen", "var(--sky)", by("notiz").map((e) => row(e))));
-  cards.push(card("Befinden", "var(--warn)", by("befinden").map((e) => row(e))));
-  cards.push(card("Für Claude vorgemerkt", "var(--bad)", by("fuer_claude").map((e) => row(e, `<span class="tag">${esc(e.daten.status || "offen")}${e.daten.modell && e.daten.status === "beantwortet" ? " · " + esc(e.daten.modell) : ""}</span>` +
-      (e.daten.antwort ? `<div class="antwort">${esc(e.daten.antwort)}</div>` : ""))),
-    {empty: "Nichts offen.", note: "Sonnet antwortet, bei Bedarf Opus"}));
-  cards.push(card("Fragen und Antworten (lokales Modell)", "var(--teal)", by("frage").map((e) => `<li>${esc(e.text)}<small>→ ${esc(e.daten.antwort)}</small></li>`)));
-  cards.push(card("Aufnahmen", "var(--faint)", aufnahmen.map((e) =>
+  const aufnahmen = by("aufnahme");
+  if (aufnahmen.length) notiertK.push(card("Aufnahmen im Wortlaut", "var(--faint)", aufnahmen.map((e) =>
     `<li>${esc(e.text)}<small>${fmtTime(e.zeit)} · ${e.daten.foto ? "Foto" : Math.floor((e.daten.sekunden || 0) / 60) + ":" + String((e.daten.sekunden || 0) % 60).padStart(2, "0") + " min"}${e.daten.privat ? " · privat" : ""}</small><details><summary>${e.daten.foto ? "Bildbeschreibung" : "Wortlaut"}</summary><p>${esc(e.daten.wortlaut)}</p></details></li>`),
-    {wide: true, empty: "Noch keine Aufnahme im gewählten Zeitraum."}));
-  // ---------- Lage: je Bereich der Ist-Wert und, wo es Sinn ergibt, die Prognose ----------
-  const lage = [], eurR = (v) => nf(Math.round(v), 0) + " €", ton = {gruen: "var(--good)", gelb: "var(--warn)", rot: "var(--bad)"};
-  const kachel = (titel, wert, zeile, farbe, ziel) => lage.push(`<a class="lage" href="#${ziel || ""}" data-ziel="${ziel || ""}" style="--t:${farbe || "var(--none)"}"><span><i></i>${esc(titel)}</span><b>${wert}</b><small>${zeile}</small></a>`);
-  const FF = d.finanzen;
-  if (FF && FF.budget) {
-    const B = FF.budget, PR = FF.prognose;
-    kachel("Noch frei diesen Monat", eurR(B.frei), PR ? `Prognose Monatsende: <u class="${PR.frei < 0 ? "minus" : ""}">${eurR(PR.frei)}</u>` : `${eurR(B.je_tag)} pro Tag`, ton[PR && PR.frei < 0 ? "rot" : B.ampel], "Geld");
-    const giro = (FF.konten || []).find((k) => k.art === "giro");
-    if (giro && giro.saldo != null) kachel("Girokonto", eurR(giro.saldo), PR && PR.giro_ende != null ? `Monatsende etwa <u>${eurR(PR.giro_ende)}</u> · ${eurR(PR.offen_fix)} feste Posten offen` : "Stand " + fmtDay(giro.stand), PR && PR.giro_ende < 0 ? "var(--bad)" : "var(--good)", "Geld");
-    const KK = FF.karte || {};
-    if (KK.vorhanden) {
-      const ueblich = (KK.kategorien || []).reduce((x, k) => x + k.schnitt, 0), tag = new Date().getDate(), tage = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
-      const hoch = KK.monat / tag * tage;
-      kachel("Kreditkarte im Monat", eurR(KK.monat), ueblich ? `hochgerechnet <u>${eurR(hoch)}</u> · üblich ${eurR(ueblich)}` : "", !ueblich ? "var(--none)" : hoch > ueblich || KK.monat > ueblich ? "var(--bad)" : hoch > ueblich * 0.8 ? "var(--warn)" : "var(--good)", "Geld");
-    }
-  }
-  if (d.cospend) {
-    const namen = Object.keys(d.cospend.saldo), ichName = d.ich && namen.includes(d.ich) ? d.ich : null,
-      anderer = namen.find((n) => n !== ichName) || "", ich = d.cospend.saldo[ichName ?? namen[0]] ?? 0,
-      off = FF && FF.cospend_offen ? FF.cospend_offen.anzahl : 0;
-    kachel(ichName && anderer ? "Verrechnung mit " + anderer : "Geteilte Ausgaben", Math.abs(ich) < 0.005 ? "ausgeglichen" : eurR(Math.abs(ich)), (Math.abs(ich) < 0.005 ? "" : !ichName ? "offen" : ich < 0 ? "du schuldest" : "du bekommst") + (off ? `${Math.abs(ich) < 0.005 ? "" : " · "}${off} Kartenkäufe nachzutragen` : Math.abs(ich) < 0.005 ? "nichts offen" : ""), ich < -0.005 ? "var(--bad)" : off ? "var(--warn)" : "var(--good)", off ? "Jetzt wichtig" : "Geld");
-  }
-  if (d.claude && d.claude.guthaben != null) {
-    const CC = d.claude, proTag = CC.tage.reduce((x, t) => x + t.usd, 0) / Math.max(1, CC.tage.length), reicht = proTag > 0.001 ? CC.guthaben / proTag : null;
-    kachel("Claude-Guthaben", nf(CC.guthaben, 2) + " $", reicht == null ? "kaum Verbrauch" : `reicht bei diesem Tempo etwa <u>${reicht > 365 ? "über ein Jahr" : nf(Math.round(reicht)) + " Tage"}</u>`, reicht != null && reicht < 14 ? "var(--bad)" : reicht != null && reicht < 45 ? "var(--warn)" : "var(--good)", "Geld");
-  }
-  const GG = d.gesundheit;
-  if (GG) {
-    // Kalenderwoche von Montag bis Sonntag – unabhängig vom oben gewählten Zeitraum
-    const mo = new Date(); mo.setDate(mo.getDate() - ((mo.getDay() + 6) % 7));
-    const moIso = mo.toLocaleDateString("sv-SE"), wtag = (new Date().getDay() + 6) % 7, rest = 6 - wtag;
-    const trAlle = (GG.training_alle && GG.training_alle.length ? GG.training_alle : GG.training || []).slice().sort((x, y) => y.tag.localeCompare(x.tag));
-    const tr = trAlle.filter((x) => x.tag >= moIso), fehlt = Math.max(0, 3 - tr.length);
-    const zuletzt = trAlle.length ? "zuletzt " + fmtDay(trAlle[0].tag) : "noch keines eingetragen";
-    kachel("Training diese Woche", tr.length + " von 3", (tr.length ? tr.reduce((x, y) => x + (y.dauer_min || 0), 0) + " Minuten · " : "") + (fehlt ? zuletzt + (rest ? ` · noch ${rest} ${rest === 1 ? "Tag" : "Tage"}` : " · letzter Tag der Woche") : "Wochenziel erreicht"),
-      !fehlt ? "var(--good)" : fehlt > rest + 1 ? "var(--bad)" : tr.length || wtag < 3 ? "var(--warn)" : "var(--bad)", "Körper und Essen");
-    const mit = GG.tage.filter((x) => x.schritte), letzte7 = mit.slice(-7), schnitt = letzte7.length ? letzte7.reduce((x, y) => x + y.schritte, 0) / letzte7.length : 0;
-    const heuteS = GG.aktuell.schritte ? GG.aktuell.schritte.wert : null;
-    if (heuteS != null) {
-      const jetzt = new Date(), anteil = Math.max(0.15, (jetzt.getHours() - 7 + jetzt.getMinutes() / 60) / 15);   // wacher Tag grob 7 bis 22 Uhr
-      const hoch = anteil < 1 ? heuteS / anteil : heuteS;
-      kachel("Schritte heute", nf(heuteS), `${anteil < 1 ? `bis heute Abend etwa <u>${nf(Math.round(hoch / 100) * 100)}</u> · ` : ""}Schnitt ${nf(Math.round(schnitt))}`, hoch >= schnitt * 0.9 ? "var(--good)" : "var(--warn)", "Körper und Essen");
-    }
-  }
-  const KA = d.kalender, offenA = aufgaben.length, vorschl = d.profil && d.profil.vorschlaege ? d.profil.vorschlaege.length : 0, naechster = KA && KA.termine && KA.termine[0];
-  kachel("Zu erledigen", offenA + (offenA === 1 ? " Aufgabe" : " Aufgaben"), (naechster ? `nächster Termin: ${esc(naechster.titel.slice(0, 28))}, ${fmtDay((naechster.beginn || "").slice(0, 10))}` : "kein Termin in den nächsten Tagen") + (vorschl ? ` · ${vorschl} Vorschläge` : ""), offenA || vorschl ? "var(--warn)" : "var(--good)", "Jetzt wichtig");
-  $("#tiles").innerHTML = lage.join("");
-  // Bild des Tages: nur wenn im Bilder-Ordner etwas liegt; lässt es sich nicht laden, verschwindet der Platz wieder
-  const bt = $("#bildtag"), adr = d.bild ? "/api/bild-des-tages?v=" + encodeURIComponent(d.bild) : "";
-  if (bt && bt.dataset.v !== adr) {
-    bt.dataset.v = adr; bt.hidden = !adr; $("#kopf").classList.toggle("mitbild", !!adr);
-    if (adr) { const im = bt.querySelector("img"); im.onerror = () => { bt.hidden = true; $("#kopf").classList.remove("mitbild"); }; im.src = adr; bt.href = adr; }
-  }
+    {wide: true}));
 
-  // ---------- Darunter: offen nur, was jetzt zählt; alles Weitere eingeklappt, leere Karten entfallen ----------
-  const titel = (h) => (h.match(/<h2><i><\/i>([^<]+)/) || [, ""])[1].trim();
-  const voll = cards.filter((h) => !h.includes('<p class="empty">'));
-  const wichtig = [/^Noch frei/, /^Über mich/, /^Aufgaben/, /^Kalender/, /^Termine/, /^Erinnerungen/, /^Für Claude/, /^Training erkannt/];
-  const nachtragen = (h) => /^In Cospend/.test(titel(h)) && h.includes("data-finanz");
   const gruppen = [
-    ["Jetzt wichtig", (t, h) => wichtig.some((re) => re.test(t)) || nachtragen(h)],
-    ["Geld", (t) => /^(Konten|Monatsbilanz|Kreditkarte|Feste Posten|Sparpotenzial|In Cospend|Letzte Umsätze|Gemeinsame Ausgaben|Claude-Guthaben)/.test(t)],
-    ["Körper und Essen", (t) => /^(Sport|Training|Schlaf|Gesundheit|Befinden|Essen)/.test(t)],
-    ["Alltag und Medien", (t) => /^(Einkäufe|Gesehen|Schaue|Zuletzt gesehen)/.test(t)],
-    ["Gedanken und Notizen", () => true]];
-  const topf = gruppen.map(() => []);
-  voll.forEach((h) => topf[gruppen.findIndex(([, passt]) => passt(titel(h), h))].push(h));
-  topf.forEach((t) => t.sort((x, y) => (titel(y) === "Training") - (titel(x) === "Training")));
+    ["Geld", geldK, "Monatsverlauf · Kreditkarte · Sparpotenzial", `Konten, Buchungen, feste Posten und geteilte Ausgaben stehen auf der Seite <a href="/m/finanzen">Finanzen</a>, die KI-Kosten unter <a href="/m/assistent">Assistent</a>.`],
+    ["Körper", koerperK, "Trainingskalender", `Schritte, Schlaf und Messwerte im Verlauf stehen auf der Seite <a href="/m/gesundheit">Gesundheit</a>.`],
+    ["Notiert", notiertK, `${feed.length} Einträge · ${aufnahmen.length} Aufnahmen · ${d.tage === 1 ? "heute" : "letzte " + d.tage + " Tage"}`, ""]];
   let offen = {};
   try { offen = JSON.parse(localStorage.getItem("meintag.offen") || "{}"); } catch (e) {}
-  $("#grid").innerHTML = gruppen.map(([name], i) => !topf[i].length ? "" : i === 0
-    ? `<h3 class="gruppe" id="${name}"><span>${name}</span></h3><div class="grid">${topf[i].join("")}</div>`
-    : `<details class="mehr" id="${name}"${offen[name] ? " open" : ""}><summary><span>${name}</span><em>${topf[i].map(titel).slice(0, 4).join(" · ")}${topf[i].length > 4 ? " · …" : ""}</em></summary><div class="grid">${topf[i].join("")}</div></details>`).join("");
+  $("#grid").innerHTML = gruppen.map(([name, karten, kurz, verweis]) => !karten.length ? "" :
+    `<details class="mehr" id="${name}"${offen[name] ? " open" : ""}><summary><span>${name}</span><em>${esc(kurz)}</em></summary><div class="grid">${karten.join("")}</div>${verweis ? `<p class="verweis">${verweis}</p>` : ""}</details>`).join("");
   verlaufZeichnen(); trainingZeichnen();
   document.querySelectorAll("details.mehr").forEach((x) => x.addEventListener("toggle", () => {
     offen[x.id] = x.open; try { localStorage.setItem("meintag.offen", JSON.stringify(offen)); } catch (e) {}
@@ -404,8 +279,8 @@ document.addEventListener("click", (ev) => {
 let verlaufT; addEventListener("resize", () => { clearTimeout(verlaufT); verlaufT = setTimeout(verlaufZeichnen, 150); });
 document.addEventListener("toggle", (e) => { if (e.target.matches && e.target.matches("details")) verlaufZeichnen(); }, true);
 document.addEventListener("click", (ev) => {
-  const k = ev.target.closest("a.lage");
-  if (!k) return;
+  const k = ev.target.closest("[data-ziel]");
+  if (!k || ev.target.closest("button, summary, a:not([data-ziel])")) return;
   ev.preventDefault();
   const z = document.getElementById(k.dataset.ziel);
   if (!z) return;

@@ -150,6 +150,84 @@ class Web(unittest.IsolatedAsyncioTestCase):
 
 
 
+class Tagesguide(unittest.TestCase):
+    """Der Guide zieht Schlüsse aus dem Schnappschuss. Geprüft wird an einem Mittwoch um 15 Uhr."""
+    JETZT = None
+
+    def guide(self, **teile):
+        import datetime as dt
+        from homie import guide
+        jetzt = dt.datetime(2026, 11, 25, 15, 0)
+        return guide.erstellen({"eintraege": [], **teile}, jetzt)
+
+    def texte(self, g, bereich=None):
+        return " | ".join(h["text"] for h in g["hinweise"] if bereich in (None, h["bereich"]))
+
+    def test_leer_bleibt_still(self):
+        g = self.guide()
+        self.assertEqual((g["hinweise"], g["agenda"], g["ampeln"]), ([], [], []))
+
+    def test_geld_schluesse(self):
+        budget = {"frei": 600, "je_tag": 100, "rest_tage": 6, "ampel": "gruen", "ausgegeben": 900, "spielraum": 1500}
+        g = self.guide(finanzen={"budget": budget, "prognose": {"frei": 250, "ausgaben": 1250, "giro_ende": 800, "offen_fix": 0, "posten": []},
+                                 "konten": [{"art": "giro", "saldo": 900, "stand": "2026-11-24"}],
+                                 "verlauf": {"ist": [100, 900], "ueblich": [80, 700, 1200]},
+                                 "karte": {"kategorien": [{"name": "Essen gehen", "monat": 140, "schnitt": 90}, {"name": "Bäcker", "monat": 20, "schnitt": 30}]}})
+        t = self.texte(g)
+        self.assertIn("[[600 € frei]]", t)
+        self.assertIn("[[200 € mehr]] ausgegeben als sonst", t)
+        self.assertIn("[[Essen gehen]]", t)
+        self.assertNotIn("Bäcker", t)
+        self.assertIn("Girokonto", g["ruhig"])
+        self.assertEqual(g["ampeln"][0]["wert"], "600 €")
+        # droht der Monat nicht aufzugehen, steht das vorn – mit dem Betrag, der pro Tag noch geht
+        g = self.guide(finanzen={"budget": {**budget, "frei": 120, "je_tag": 20}, "prognose": {"frei": -180, "ausgaben": 1680, "giro_ende": -40, "offen_fix": 300, "posten": []},
+                                 "konten": [{"art": "giro", "saldo": 260, "stand": "2026-11-10"}]})
+        self.assertEqual(g["hinweise"][0]["ton"], "kritisch")
+        t = self.texte(g)
+        self.assertIn("fehlen am Ende etwa 180 €", t)
+        self.assertIn("[[20 € pro Tag]]", t)
+        self.assertIn("ins Minus", t)
+        self.assertIn("Kontodaten sind vom [[10.11.]]", t)
+
+    def test_training_mit_kalender_und_agenda(self):
+        termin = lambda tag, uhr, titel: {"titel": titel, "beginn": f"{tag}T{uhr}:00+01:00", "ganztags": False, "ort": ""}
+        g = self.guide(kalender={"termine": [termin("2026-11-26", "08:30", "Zahnarzt"), termin("2026-11-27", "18:00", "Kino"), termin("2026-12-20", "10:00", "weit weg")]},
+                       gesundheit={"tage": [], "aktuell": {}, "training_alle": [{"tag": "2026-11-23"}, {"tag": "2026-11-17"}, {"tag": "2026-11-18"}, {"tag": "2026-11-20"}]},
+                       eintraege=[{"typ": "aufgabe", "tag": "2026-11-20", "text": "Steuer abgeben", "daten": {"faellig": "2026-11-23"}},
+                                  {"typ": "aufgabe", "tag": "2026-10-01", "text": "uralt", "daten": {"faellig": "2026-10-02"}},
+                                  {"typ": "termin", "tag": "2026-11-24", "text": "Friseur", "daten": {"datum": "2026-11-28", "uhrzeit": "11:00"}}])
+        t = self.texte(g)
+        self.assertIn("Noch [[2 Trainings]] bis Sonntag", t)
+        self.assertIn("Im Kalender frei sind [[heute, Samstag und Sonntag]]", t)      # Donnerstag und Freitag haben Termine
+        self.assertIn("Morgen geht es früh los: [[08:30 Zahnarzt]]", t)
+        self.assertIn("[[1 Aufgabe ist überfällig]]: Steuer abgeben", t)
+        self.assertIn("noch nicht im Kalender: [[Friseur (Samstag)]]", t)
+        self.assertEqual(g["hinweise"][0]["ton"], "kritisch")
+        self.assertEqual([(a["tag"], a["titel"]) for a in g["agenda"]],
+                         [("2026-11-25", "Steuer abgeben"), ("2026-11-26", "Zahnarzt"), ("2026-11-27", "Kino"), ("2026-11-28", "Friseur")])
+        self.assertIn("eine Aufgabe offen", g["kopf"])
+        # Ziel erreicht: die Serie der Wochen zählt mit
+        g = self.guide(gesundheit={"tage": [], "aktuell": {}, "training_alle": [{"tag": t} for t in ("2026-11-23", "2026-11-24", "2026-11-25", "2026-11-17", "2026-11-18", "2026-11-20", "2026-11-10")]})
+        self.assertIn("Wochenziel erreicht: [[3 Trainings]] – die 2. Woche in Folge.", self.texte(g))
+
+    def test_schlaf_und_schritte(self):
+        import datetime as dt
+        tage = [{"tag": (dt.date(2026, 11, 25) - dt.timedelta(days=i)).isoformat(), "schritte": 8000 if i < 8 else 5000, "schlaf_min": 450} for i in range(1, 15)]
+        g = self.guide(gesundheit={"tage": tage + [{"tag": "2026-11-25", "schlaf_min": 330}], "aktuell": {"schritte": {"wert": 1500}}, "training_alle": []})
+        t = self.texte(g)
+        self.assertIn("Letzte Nacht [[5 h 30]] Schlaf, das sind 2 h 00 weniger", t)
+        self.assertIn("[[3.000 Schritte mehr]] pro Tag gegangen als in der Woche davor", t)
+        self.assertIn("werden es etwa [[2.800 Schritte]]", t)            # 15 Uhr: gut die Hälfte des wachen Tages ist um
+        # zu wenige Nächte zum Vergleichen: keine Aussage über „weniger als sonst“
+        g = self.guide(gesundheit={"tage": [{"tag": "2026-11-25", "schlaf_min": 330}, {"tag": "2026-11-24", "schlaf_min": 480}], "aktuell": {}, "training_alle": []})
+        self.assertNotIn("weniger als dein Schnitt", self.texte(g))
+
+    def test_kaputte_quelle_reisst_nichts_mit(self):
+        g = self.guide(finanzen={"budget": "kaputt"}, gesundheit={"tage": [{"kein": "tag"}], "training_alle": "x"}, kalender={"termine": [{"beginn": None}]}, cospend={"saldo": 5})
+        self.assertIsInstance(g["hinweise"], list)
+
+
 class BildDesTages(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.tmp = tempfile.TemporaryDirectory()

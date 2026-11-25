@@ -18,18 +18,24 @@
 
 <header>
   <div><h1>Mein Tag</h1><p id="sub">Lade …</p></div>
-  <span class="spacer"></span>
-  <div class="seg" role="group" aria-label="Zeitraum">
-    <button data-d="1">Heute</button><button data-d="7" aria-pressed="true">7 Tage</button><button data-d="30">30 Tage</button><button data-d="90">90 Tage</button>
-  </div>
 </header>
 <main>
   <div id="errors"></div>
-  <div class="kopf" id="kopf">
+  <section class="guide" id="guide">
     <a class="bildtag" id="bildtag" hidden target="_blank" rel="noopener" title="Bild des Tages – in voller Größe öffnen"><img alt="Bild des Tages" decoding="async"><span>Bild des Tages</span></a>
-    <section class="tiles" id="tiles"></section>
+    <div class="gkopf"><p id="gsatz" class="gsatz"></p><div class="ampeln" id="ampeln"></div></div>
+  </section>
+  <div class="zwei">
+    <article class="card" id="hinweise" style="--c:var(--accent)"></article>
+    <article class="card" id="agenda" style="--c:var(--sky)"></article>
   </div>
-  <section class="grid" id="grid"></section>
+  <section id="entscheiden"></section>
+  <div class="rueck"><h3 class="gruppe"><span>Details und Rückblick</span></h3>
+    <div class="seg" role="group" aria-label="Zeitraum für Notiertes">
+      <button data-d="1">Heute</button><button data-d="7" aria-pressed="true">7 Tage</button><button data-d="30">30 Tage</button><button data-d="90">90 Tage</button>
+    </div>
+  </div>
+  <section id="grid"></section>
 </main>
 </body>
 </html>

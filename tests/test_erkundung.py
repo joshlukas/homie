@@ -360,7 +360,7 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         r = await self.c.get("/m/tag")
         text = await r.text()
         self.assertEqual(r.status, 200)
-        for erwartet in ("/static/mein-tag.js", "/static/mein-tag.css", 'id="tiles"', "data-csrf=", 'href="/m/tag" aria-current="page"', "Abmelden"):
+        for erwartet in ("/static/mein-tag.js", "/static/mein-tag.css", 'id="hinweise"', "data-csrf=", 'href="/m/tag" aria-current="page"', "Abmelden"):
             self.assertIn(erwartet, text)
         self.assertIn("img-src 'self' data: https:", r.headers["Content-Security-Policy"])
         self.assertNotIn(GUT, text)
@@ -375,7 +375,9 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(d["gesundheit"]["aktuell"]["schritte"]["wert"], 8432)          # der neuere von zwei Sensoren
         self.assertEqual(d["gesundheit"]["aktuell"]["puls"]["wert"], 61)
         self.assertNotIn("ruhepuls", d["gesundheit"]["aktuell"])                        # „unknown“ fehlt
-        self.assertEqual((len(d["gesundheit"]["tage"]), d["gesundheit"]["tage"][-1]["schritte"]), (7, 8432))
+        self.assertEqual((len(d["gesundheit"]["tage"]), d["gesundheit"]["tage"][-1]["schritte"]), (30, 8432))   # der Guide vergleicht mit einem Monat
+        self.assertEqual(d["tage"], 7)
+        self.assertEqual({"kopf", "hinweise", "agenda", "ampeln", "ruhig"} - set(d["guide"]), set())
         self.assertTrue(any("nicht verbunden" in f for f in d["fehler"]))               # Notiz-Assistent fehlt hier noch
         self.assertEqual((d["finanzen"], d["yamtrack"], d["eintraege"]), (None, None, []))
         self.assertNotIn(GUT, json.dumps(d))

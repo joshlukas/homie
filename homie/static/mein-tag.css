@@ -15,7 +15,6 @@ header p{margin:0;color:var(--muted);font-size:13px}
 .seg button{background:none;border:0;color:var(--muted);padding:7px 14px;font:inherit;font-size:13px;cursor:pointer}
 .seg button[aria-pressed=true]{background:rgba(129,140,248,.2);color:var(--text)}
 main{max-width:1280px;margin:0 auto}
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:6px 0 18px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px;align-items:start}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;min-width:0}
 .card.wide{grid-column:1/-1}
@@ -38,15 +37,6 @@ li small{display:block;color:var(--faint);font-size:12px;margin-top:2px}
 .media div{min-width:0}
 details{margin-top:4px}summary{cursor:pointer;color:var(--muted);font-size:12.5px}
 details p{margin:6px 0 0;color:var(--muted);font-size:13.5px}
-.bars{display:flex;gap:6px;align-items:flex-end;height:64px;margin-top:6px}
-.bars div{flex:1;background:rgba(129,140,248,.55);border-radius:4px 4px 0 0;min-height:2px;position:relative}
-.bars div span{position:absolute;bottom:-18px;left:0;right:0;text-align:center;font-size:10.5px;color:var(--faint)}
-.barwrap{padding-bottom:20px}
-.avg{margin:0 0 8px;color:var(--muted);font-size:12.5px}
-.bars{gap:clamp(1px,.5vw,6px)}
-.bars.good div{background:rgba(52,211,153,.55)}
-.hstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:8px;margin-bottom:10px}
-.hstat b{display:block;font-size:19px;font-variant-numeric:tabular-nums}.hstat span{color:var(--muted);font-size:11.5px}
 
 /* Gemeinsames Aussehen „Nocturne“.
    Tiefes Indigo, weiche Flächen ohne harte Rahmen, Verläufe Violett → Pink → Koralle als Akzent.
@@ -162,8 +152,6 @@ li small { color: var(--faint); }
 .knoepfe button[data-ja="1"] { border: 0; background: var(--g-violet); color: #fff; box-shadow: 0 10px 20px -10px rgba(106, 92, 255, 0.95); }
 .err { background: rgba(255, 107, 139, 0.1); border-color: rgba(255, 107, 139, 0.3); }
 
-.bars div { background: linear-gradient(180deg, #a36bff, #6a5cff); border-radius: 5px 5px 0 0; }
-.bars.good div { background: linear-gradient(180deg, #2fd4c4, #5b9dff); }
 .media img { border-radius: 8px; background: var(--surface-strong); }
 
 /* ---------- Seiten-Tabs (auf allen Seiten gleich) ---------- */
@@ -180,7 +168,6 @@ li small { font-size: 12.5px; color: var(--faint); margin-top: 3px; }
 .card h2 em { font-size: 12.5px; color: var(--muted); text-align: right; }
 
 /* ---------- Lage: Ist-Wert und Prognose je Bereich ---------- */
-.tiles { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 4px 0 8px; }
 .lage { position: relative; display: block; padding: 16px 18px 15px; border-radius: var(--radius); text-decoration: none; color: var(--text);
   background: linear-gradient(180deg, var(--surface-2) -40%, var(--surface) 38%); border: 1px solid var(--border); box-shadow: var(--shadow); overflow: hidden; transition: transform 0.15s, border-color 0.15s; }
 .lage:hover { text-decoration: none; transform: translateY(-2px); border-color: color-mix(in srgb, var(--t) 60%, transparent); }
@@ -216,12 +203,6 @@ details.mehr summary { margin: 0; }
 .gross.minus { background: none; color: var(--bad); }
 .klein { display: block; color: var(--muted); font-size: 13.5px; }
 .punkt { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; box-shadow: 0 0 0 4px rgba(150, 160, 255, 0.12); }
-.minis { flex: 2 1 320px; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; min-width: 0; }
-.mini { background: var(--surface-strong); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
-.mini b { display: block; font: 600 22px/1.15 var(--display); font-variant-numeric: tabular-nums; }
-.mini.minus b, .betrag.minus, .saeule b.minus { color: var(--bad); }
-.mini.plus b, .betrag.plus, .saeule b.plus { color: var(--good); }
-.mini span { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; margin-top: 4px; }
 .chart { margin: 18px 0 4px; }
 .chart svg { display: block; width: 100%; height: auto; }
 .grenze { stroke: var(--warn); stroke-width: 1.2; stroke-dasharray: 5 5; opacity: 0.8; }
@@ -240,15 +221,9 @@ details.mehr summary { margin: 0; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .chips .tag { margin-left: 0; }
 
-.saeulen { display: flex; gap: clamp(6px, 2vw, 16px); align-items: flex-end; margin: 6px 0 4px; }
-.saeule { flex: 1; min-width: 0; text-align: center; }
 .paar { height: 150px; display: flex; gap: 4px; align-items: flex-end; justify-content: center; }
 .paar i { flex: 0 1 18px; border-radius: 6px 6px 2px 2px; }
 .paar .ein { background: var(--g-teal); } .paar .aus { background: var(--g-pink); }
-.saeule span { display: block; margin-top: 8px; font-size: 12px; color: var(--muted); }
-.saeule b { display: block; font: 600 13px var(--display); font-variant-numeric: tabular-nums; }
-.saeule.jetzt span { color: var(--text); font-weight: 600; }
-.saeule.jetzt .paar i { opacity: 0.6; }
 
 .kat { display: flex; flex-direction: column; gap: 12px; margin: 6px 0 4px; }
 .katzeile { display: grid; grid-template-columns: minmax(96px, 34%) 1fr auto; gap: 12px; align-items: center; }
@@ -342,8 +317,6 @@ body > header { padding-top: 8px; }
 .satz { margin: 4px 0 2px; font: 600 clamp(22px, 3.6vw, 32px)/1.2 var(--display); letter-spacing: -0.02em; text-wrap: balance; }
 .satz b { background: var(--g-brand); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: 700; }
 .satz b.minus { background: none; color: var(--bad); }
-.satz2 { margin: 0 0 18px; color: var(--muted); font-size: 16px; }
-.satz2 b { color: var(--text); font-weight: 600; } .satz2 b.plus { color: var(--good); } .satz2 b.minus { color: var(--bad); }
 .budget { display: flex; gap: 3px; height: 22px; border-radius: 11px; overflow: hidden; background: rgba(255, 255, 255, 0.05); }
 .budget i, .budgetleg i { display: block; }
 .b-aus { background: linear-gradient(90deg, #7c6cff, #ff5fa2); } .b-aus.ueber { background: var(--bad); }
@@ -354,13 +327,6 @@ body > header { padding-top: 8px; }
 .budgetleg i { width: 12px; height: 12px; border-radius: 4px; flex: none; }
 .budgetleg b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
 .budgetleg .rechts { margin-left: auto; }
-.minis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; flex: none; }
-.mini { border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; }
-.mini span { display: block; margin: 0; font-size: 12.5px; font-weight: 600; color: var(--muted); }
-.mini b { display: block; margin: 6px 0 3px; font: 600 24px/1.15 var(--display); font-variant-numeric: tabular-nums; }
-.mini small { display: block; font-size: 12.5px; line-height: 1.4; color: var(--faint); }
-.charttitel { margin: 26px 0 0; font: 600 15.5px var(--display); display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
-.charttitel small { font: 400 13px var(--body); color: var(--faint); }
 .chart { margin: 8px 0 2px; min-height: 250px; }
 .c-gitter { stroke: rgba(255, 255, 255, 0.06); stroke-width: 1; } .c-gitter.null { stroke: rgba(255, 255, 255, 0.16); }
 .c-achse { font: 500 12px var(--body); fill: var(--faint); font-variant-numeric: tabular-nums; } .c-achse.hell { fill: var(--text); font-weight: 700; }
@@ -381,10 +347,6 @@ body > header { padding-top: 8px; }
 @media (max-width: 560px) { .held { padding: 18px 16px 14px; } .budgetleg .rechts { margin-left: 0; } }
 
 /* ---------- Kalender in voller Breite: Termine nebeneinander ---------- */
-.kal ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
-.kal li, .kal li:first-child { border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; background: var(--surface-strong); font-weight: 600; }
-.kal li .tag { display: table; margin: 6px 0 2px; }
-.kal li small { font-weight: 400; }
 
 /* Startseite am Handy: erst der Überblick, dann der große Netzplan */
 
@@ -503,13 +465,60 @@ details.mehr .card{ -webkit-backdrop-filter: none; backdrop-filter: none; }
 .menue .abmelden { margin: 0 0 0 auto; flex: none; }
 .menue .abmelden button { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface-strong); color: var(--text); font: 600 13px var(--body); cursor: pointer; }
 
-/* ---------- Bild des Tages: links neben den Kopfkacheln, am Handy als flacher Streifen darüber ---------- */
-.kopf { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin: 4px 0 8px; }
-.kopf .tiles { margin: 0; }
-.kopf.mitbild { grid-template-columns: minmax(200px, 270px) minmax(0, 1fr); }
-.bildtag { position: relative; display: block; min-height: 168px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow); background: var(--surface); }
+/* ---------- Tagesguide: Bild, ein Satz zum Tag, Ampeln; darunter Hinweise und Agenda ---------- */
+.guide { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; margin: 4px 0 14px; align-items: stretch; }
+.guide.mitbild { grid-template-columns: minmax(180px, 240px) minmax(0, 1fr); }
+.gkopf { display: flex; flex-direction: column; justify-content: center; gap: 14px; min-width: 0; }
+.gsatz { margin: 0; font: 600 clamp(19px, 2.3vw, 26px)/1.3 var(--display); letter-spacing: -0.015em; text-wrap: balance; }
+.ampeln { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.ampel { position: relative; display: block; padding: 11px 14px 10px 16px; border-radius: 14px; text-decoration: none; color: var(--text); background: var(--surface); border: 1px solid var(--border); overflow: hidden; transition: border-color 0.15s, transform 0.15s; }
+.ampel:hover { text-decoration: none; transform: translateY(-1px); border-color: color-mix(in srgb, var(--t) 60%, transparent); }
+.ampel::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--t); }
+.ampel span { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.ampel span i { width: 8px; height: 8px; border-radius: 50%; background: var(--t); }
+.ampel b { display: block; font: 700 21px/1.2 var(--display); letter-spacing: -0.02em; margin: 3px 0 1px; font-variant-numeric: tabular-nums; }
+.ampel small { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bildtag { position: relative; display: block; min-height: 150px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); box-shadow: var(--shadow); background: var(--surface); }
 .bildtag[hidden] { display: none; }
 .bildtag img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s; }
 .bildtag:hover img { transform: scale(1.03); }
 .bildtag span { position: absolute; left: 10px; bottom: 10px; padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600; color: #fff; background: rgba(10, 12, 30, 0.55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
-@media (max-width: 760px) { .kopf.mitbild { grid-template-columns: minmax(0, 1fr); } .bildtag { min-height: 0; aspect-ratio: 21 / 9; max-height: 180px; width: 100%; } }
+.zwei { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.saetze, .apunkte, .feed { list-style: none; margin: 0; padding: 0; }
+.saetze li { display: flex; gap: 12px; align-items: baseline; padding: 10px 0; border-top: 1px solid var(--border); font-size: 15px; line-height: 1.45; }
+.saetze li:first-child { border-top: 0; padding-top: 2px; }
+.saetze li[data-ziel] { cursor: pointer; }
+.saetze li > i { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--t); box-shadow: 0 0 0 4px color-mix(in srgb, var(--t) 18%, transparent); transform: translateY(-1px); }
+.saetze em, .feed em { font-style: normal; display: inline-block; margin-right: 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--t); }
+.saetze b { font-weight: 650; color: var(--text); }
+.saetze span { color: color-mix(in srgb, var(--text) 86%, transparent); }
+.ruhig { margin: 12px 0 0; padding-top: 10px; border-top: 1px dashed var(--border); font-size: 12.5px; color: var(--faint); }
+details.rest { margin-top: 8px; }
+details.rest > summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+details.rest p { margin: 6px 0 0; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+.atag { margin: 14px 0 4px; font: 600 12px/1 var(--body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.atag:first-of-type { margin-top: 2px; }
+.atag.heute { color: var(--sky); }
+.apunkte li { display: grid; grid-template-columns: 44px 9px minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 7px 0; border-top: 1px solid var(--border); font-size: 15px; }
+.apunkte li:first-child { border-top: 0; }
+.apunkte time { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.apunkte i { width: 9px; height: 9px; border-radius: 3px; background: var(--t); }
+.apunkte small, .feed small { display: block; font-size: 12.5px; color: var(--faint); margin-top: 1px; }
+.apunkte li.dringend span { color: var(--bad); }
+.feed li { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 6px; align-items: baseline; padding: 7px 0; border-top: 1px solid var(--border); font-size: 14.5px; line-height: 1.45; }
+.feed li:first-child { border-top: 0; }
+.feed .tag { margin-left: 8px; }
+.rueck { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 12px; }
+.rueck .gruppe { flex: 1; margin: 18px 0 10px; min-width: 220px; }
+.verweis { margin: 0; padding: 0 18px 14px; font-size: 13px; color: var(--muted); }
+#entscheiden .gruppe { margin-top: 22px; }
+@media (max-width: 900px) { .zwei { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) {
+  .guide.mitbild { grid-template-columns: minmax(0, 1fr); }
+  .bildtag { min-height: 0; aspect-ratio: 21 / 9; max-height: 140px; width: 100%; }
+  .ampeln { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
+  .ampel { padding: 9px 10px 8px 13px; }
+  .ampel b { font-size: 18px; }
+  .ampel small { font-size: 11px; }
+  .feed li { grid-template-columns: minmax(0, 1fr); gap: 0; }
+}

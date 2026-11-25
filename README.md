@@ -12,7 +12,7 @@
 
 | | |
 |---|---|
-| **Mein Tag** – das Wichtigste auf einen Blick: was diesen Monat noch frei ist, Konten, Training der Woche, Schritte, Termine, Aufgaben. Darunter alles, was du eingesprochen hast, nach Themen geordnet. | ![Mein Tag](docs/bilder/mein-tag.webp) |
+| **Mein Tag** – ein Guide für den Tag: ein Satz zur Lage, wenige Hinweise mit Schlüssen aus Geld, Kalender, Training, Schlaf und Schritten (Prognosen, Veränderungen, Tipps), daneben die Agenda der nächsten Tage und alles, was auf ein Ja oder Nein wartet. Einzelwerte und der Rückblick auf Eingesprochenes liegen eingeklappt darunter. | ![Mein Tag](docs/bilder/mein-tag.webp) |
 | **Trainingskalender** – jede Woche zählt von Montag bis Sonntag gegen dein Ziel; dazu Monate und Jahre im Vergleich. | ![Trainingskalender](docs/bilder/mein-tag-koerper.webp) |
 | **Aufnahme** – ein großer Knopf für die Sprachnotiz. Daneben: Kassenbon fotografieren oder Kontoauszug hochladen. Was nicht gleich ankommt, bleibt im Gerät und wird nachgesendet. | ![Aufnahme](docs/bilder/aufnahme.webp) |
 | **Dokumente** – dein Paperless-ngx-Archiv als Stream: ein Dokument je Bildschirm, mit Zeitachse, Suche im Volltext, Filtern und Leser für das ganze PDF. | ![Dokumente als Stream](docs/bilder/dokumente.webp) |
@@ -181,7 +181,7 @@ Auf der Seite *Aufnahme* lässt sich neben der Sprachnotiz ein Foto aufnehmen od
 
 ## Bild des Tages
 
-„Mein Tag“ zeigt oben neben den Kacheln ein Bild, jeden Tag ein anderes. Die Bilder (jpg, png, webp, gif, avif) liegen im Volume `homie-bilder`; Homie liest dort nur. Ist der Ordner leer, bleibt der Platz weg. Wiederholt wird ein Bild erst, wenn alle an der Reihe waren.
+„Mein Tag“ zeigt oben neben dem Satz zum Tag ein Bild, jeden Tag ein anderes. Die Bilder (jpg, png, webp, gif, avif) liegen im Volume `homie-bilder`; Homie liest dort nur. Ist der Ordner leer, bleibt der Platz weg. Wiederholt wird ein Bild erst, wenn alle an der Reihe waren.
 
 Mit `HOMIE_BILDER_FREIGABE=1` gibt der kleine Dienst `bilder-freigabe` diesen einen Ordner im Heimnetz als Windows-Freigabe frei: `smb://<Rechner>/bilder`, zum Lesen und Schreiben. Die Freigabe hat **kein Passwort** – jedes Gerät im Heimnetz kann Bilder ablegen und löschen. Schalte sie nur ein, wenn du allen Geräten dort vertraust; angenommen werden ohnehin nur private Adressen. Ohne Freigabe kommen Bilder zum Beispiel mit `docker cp` in das Volume.
 
