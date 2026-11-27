@@ -61,6 +61,10 @@ MODULE: tuple[Modul, ...] = (
         (Bedarf("assistent", "ein Notiz-Assistent (eigener Dienst, der Sprachnotizen verschriftlicht)", ("token",)),), farbe="#2fd4c4",
     ),
     Modul(
+        "gedaechtnis", "Gedächtnis", "Fragen an die eigenen Notizen, Dokumente und das Profil stellen; Notizen tippen.",
+        (Bedarf("assistent", "ein Notiz-Assistent (eigener Dienst, mit Gedächtnis)", ("token",)),), farbe="#7aa2ff",
+    ),
+    Modul(
         "gesundheit", "Gesundheit", "Schlaf, Bewegung und Messwerte im Verlauf.",
         (Bedarf("homeassistant", "Home Assistant (mit der Handy-App, die Gesundheitswerte meldet)", ("token",)),), farbe="#3ddc97",
     ),

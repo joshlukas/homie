@@ -48,6 +48,7 @@ Ein vorgeschlagener Plan ist ein Entwurf. Lesen, bestätigen und ausführen kann
 | `homie/meintag.py` | trägt für „Mein Tag“ alles in einer Antwort zusammen (`/api/tag`); die Seite dazu ist `static/mein-tag.js` |
 | `homie/gesundheit.py`, `homie/tag.py` | Modul Gesundheit: liest Home Assistant; `tag.py` liefert nur die Zeitzone |
 | `homie/assistent.py` | Module Aufnahme, Finanzen, Assistent: lesen den Notiz-Assistenten; geben neue Aufnahmen, Fotos, Kontoauszüge und Entscheidungen zu Vorschlägen an ihn weiter (`static/hochladen.js`) |
+| `homie/gedaechtnis.py` | Modul Gedächtnis: reicht Fragen an den Gedächtnis-Dienst des Notiz-Assistenten weiter (`/api/frage`, `/api/stand`) und getippte Notizen an `/api/aufnahme`; speichert nichts. Nach außen (Claude) geht eine Frage nur, wenn der Nutzer den Knopf dafür drückt; die Seite dazu ist `static/gedaechtnis.js` |
 | `homie/dokumente.py` | Modul Dokumente: liest Paperless-ngx (nur lesend, nichts wird gespeichert); die Seite dazu ist `static/dokumente.js` |
 | `homie/guide.py` | Tagesguide für „Mein Tag“: zieht aus dem Schnappschuss mit festen Regeln Schlüsse (Hinweise, Agenda, Ampeln). Kein Sprachmodell; jede Regel schweigt, wenn ihre Daten fehlen. Neue Regeln brauchen einen Test in `tests/test_grundgeruest.py` |
 | `homie/bildtag.py` | Bild des Tages: wählt täglich ein Bild aus dem nur lesbar eingehängten Ordner `/bilder`; ausgeliefert unter `GET /api/bild-des-tages` mit fester Bildart (nie HTML oder SVG) |

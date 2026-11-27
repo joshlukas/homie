@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "0.18.1"
+VERSION = "0.19.0"
 PAKET = Path(__file__).resolve().parent
 
 
@@ -26,6 +26,7 @@ class Einstellungen:
     beispiele: Path        # Beispielzustand für das Onboarding (keine echten Daten)
     yamtrack: str = ""     # Pfad zur nur lesbar eingehängten Yamtrack-Datenbank (freiwillig)
     yamtrack_helfer: str = ""   # Adresse des Helfers, der Gesehenes in Yamtrack einträgt ("" = aus)
+    gedaechtnis: str = ""       # Adresse des Gedächtnis-Dienstes ("" = derselbe Rechner wie der Notiz-Assistent, Port 8097)
     bilder: Path = Path("/bilder")   # Ordner für das „Bild des Tages“ (freiwillig; leer oder fehlend = kein Bild)
 
     @property
@@ -52,5 +53,6 @@ def laden(umgebung: dict[str, str] | None = None) -> Einstellungen:
         beispiele=Path(u.get("HOMIE_BEISPIELE", PAKET.parent / "config" / "beispiel-dienste.json")),
         yamtrack=u.get("HOMIE_YAMTRACK_DB", "/yamtrack/db.sqlite3"),
         bilder=Path(u.get("HOMIE_BILDER", "/bilder")),
+        gedaechtnis=u.get("HOMIE_GEDAECHTNIS_URL", "").strip().rstrip("/"),
         yamtrack_helfer=u.get("HOMIE_YAMTRACK_URL", "http://127.0.0.1:23751").strip().rstrip("/") if _an(u.get("HOMIE_YAMTRACK_SCHREIBEN"), False) else "",
     )

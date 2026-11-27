@@ -16,7 +16,7 @@ import jinja2
 from aiohttp import web
 from yarl import URL
 
-from . import agenten, assistent, ausfuehren, bildtag, dokumente, gesundheit, guide, katalog, meintag, module, plaene, proxmox, verbinden, yamtrack
+from . import agenten, assistent, ausfuehren, bildtag, dokumente, gedaechtnis, gesundheit, guide, katalog, meintag, module, plaene, proxmox, verbinden, yamtrack
 from .ablage import Ablage
 from .anmeldung import COOKIE, MIN_LAENGE, Anmeldung, passwort_maengel
 from .config import PAKET, VERSION, Einstellungen
@@ -697,6 +697,60 @@ async def aufnahme_senden(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "name": name})
 
 
+def _gedaechtnis(request: web.Request) -> tuple[str, str] | None:
+    """Adresse und Schlüssel des Gedächtnisses, wenn das Modul aktiv ist."""
+    aktiv = any(s.aktiv and s.modul.id == "gedaechtnis" for s in module.stand(request.app[K_DB], request.app[K_ABLAGE]))
+    zugang = _zugang(request.app, "assistent", ("token",)) if aktiv else None
+    return None if zugang is None else (gedaechtnis.adresse(zugang[0], request.app[K_EINST].gedaechtnis), zugang[1]["token"])
+
+
+async def _seite_gedaechtnis(request: web.Request, modul: module.Modul) -> web.Response:
+    zugang = _gedaechtnis(request)
+    return _seite(request, "gedaechtnis.html", modul=modul, stand=await gedaechtnis.stand(*zugang) if zugang else None)
+
+
+async def gedaechtnis_frage(request: web.Request) -> web.Response:
+    """Reicht eine Frage an das Gedächtnis weiter. Homie behält weder Frage noch Antwort."""
+    zugang = _gedaechtnis(request)
+    if zugang is None:
+        return web.json_response({"fehler": "Das Modul Gedächtnis ist nicht aktiv."}, status=404)
+    try:
+        daten = json.loads(await request.read())
+        frage, claude = " ".join(str(daten["frage"]).split()), daten.get("claude") is True
+    except (ValueError, KeyError, TypeError):
+        return web.json_response({"fehler": "Ungültige Anfrage."}, status=400)
+    if not 3 <= len(frage) <= gedaechtnis.MAX_FRAGE:
+        return web.json_response({"fehler": "Die Frage ist zu kurz oder zu lang."}, status=400)
+    try:
+        return web.json_response({"ok": True, **await gedaechtnis.fragen(*zugang, frage, claude)}, dumps=lambda o: json.dumps(o, ensure_ascii=False))
+    except assistent.AssistentFehler as e:
+        return web.json_response({"fehler": str(e)}, status=502)
+
+
+async def gedaechtnis_notiz(request: web.Request) -> web.Response:
+    """Gibt eine getippte Notiz an den Notiz-Assistenten ab – er wertet sie aus wie eine Sprachnotiz."""
+    if _gedaechtnis(request) is None:
+        return web.json_response({"fehler": "Das Modul Gedächtnis ist nicht aktiv."}, status=404)
+    if request.content_type != "text/plain":
+        return web.json_response({"fehler": "Erwartet wird reiner Text."}, status=415)
+    inhalt = await _roh(request, gedaechtnis.MAX_NOTIZ)
+    if inhalt is None:
+        return web.json_response({"fehler": "Die Notiz ist zu lang (höchstens 20.000 Zeichen)."}, status=413)
+    try:
+        inhalt = inhalt.decode("utf-8").strip().encode("utf-8")
+    except UnicodeDecodeError:
+        return web.json_response({"fehler": "Erwartet wird reiner Text."}, status=400)
+    if len(inhalt) < 3:
+        return web.json_response({"fehler": "Die Notiz ist leer."}, status=400)
+    zugang = _zugang(request.app, "assistent", ("token",))
+    try:
+        name = await assistent.aufnahme_senden(zugang[0], zugang[1]["token"], inhalt, "text/plain; charset=utf-8", str(int(time.time())))
+    except assistent.AssistentFehler as e:
+        return web.json_response({"fehler": str(e)}, status=502)
+    meintag._merker.clear()
+    return web.json_response({"ok": True, "name": name})
+
+
 async def dokument_vorschau(request: web.Request) -> web.Response:
     zugang = _archiv(request)
     try:
@@ -906,6 +960,8 @@ async def modulseite(request: web.Request) -> web.Response:
                 return await _seite_gesundheit(request, s.modul)
             if kennung == "aufnahme":
                 return await _seite_aufnahme(request, s.modul)
+            if kennung == "gedaechtnis":
+                return await _seite_gedaechtnis(request, s.modul)
             if kennung == "finanzen":
                 return await _seite_finanzen(request, s.modul)
             return _seite(request, "modul.html", modul=s.modul)
@@ -1025,6 +1081,8 @@ def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, er
         web.get("/agent/plaene", agent_plaene),
         web.post("/agent/plaene", agent_plan_vorschlagen),
         web.post("/m/aufnahme/senden", aufnahme_senden),
+        web.post("/m/gedaechtnis/frage", gedaechtnis_frage),
+        web.post("/m/gedaechtnis/notiz", gedaechtnis_notiz),
         web.get("/m/dokumente/vorschau/{nr:\\d+}", dokument_vorschau),
         web.post("/dienst/{id}/verbinden", dienst_verbinden),
         web.post("/dienst/{id}/{was:trennen|ignorieren|zeigen}", dienst_zustand),

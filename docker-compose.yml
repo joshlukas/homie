@@ -22,6 +22,7 @@ services:
       HOMIE_MASTER_KEY: ${HOMIE_MASTER_KEY:-}
       HOMIE_YAMTRACK_SCHREIBEN: ${HOMIE_YAMTRACK_SCHREIBEN:-0}
       HOMIE_YAMTRACK_URL: http://127.0.0.1:${HOMIE_YAMTRACK_PORT:-23751}
+      HOMIE_GEDAECHTNIS_URL: ${HOMIE_GEDAECHTNIS_URL:-}   # leer: derselbe Rechner wie der Notiz-Assistent, Port 8097
       TZ: ${TZ:-Europe/Berlin}
     volumes:
       - homie-daten:/data          # alles Private: Konto, Erkanntes, verschlüsselte Schlüssel

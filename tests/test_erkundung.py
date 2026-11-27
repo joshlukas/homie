@@ -14,7 +14,7 @@ import aiohttp
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
-from homie import erkundung, katalog, meintag, module, yamtrack
+from homie import erkundung, gedaechtnis, katalog, meintag, module, yamtrack
 from homie.config import laden
 from homie.server import K_ABLAGE, K_DB, K_ERK, app_bauen
 
@@ -234,9 +234,27 @@ def _nd_entscheid(art):
     return f
 
 
+GEFRAGT = []
+
+
+async def _nd_frage(request):
+    GEFRAGT.append(await request.json())
+    claude = GEFRAGT[-1]["claude"] == "immer"
+    return web.json_response({"antwort": "Am Dienstag.", "gefunden": True, "sicher": not claude, "weg": "claude" if claude else "lokal", "hinweis": "", "sekunden": 3.4, "quellen": [
+        {"nr": 1, "quelle": "notiz", "titel": "Notiz vom 3.3.", "datum": "2026-03-03", "link": None, "ausschnitt": "Müll kommt am Dienstag."},
+        {"nr": 2, "quelle": "paperless", "titel": "Abfallkalender", "datum": "2026-01-02", "link": "https://archiv.example/documents/7", "ausschnitt": "Restmüll: dienstags"},
+        {"nr": 3, "quelle": "paperless", "titel": "Böse", "datum": None, "link": "javascript:alert(1)", "ausschnitt": ""}]})
+
+
+async def _nd_stand(request):
+    return web.json_response({"quellen": {"notiz": {"stuecke": 9, "eintraege": 7}, "paperless": {"stuecke": 40, "eintraege": 5}, "profil": {"stuecke": 2, "eintraege": 1}},
+                              "zuletzt_eingelesen": "2026-03-04T07:30:00+01:00", "claude": {"frei": True}})
+
+
 NOTIZDIENST = {"/api/eintraege": _nd(_nd_eintraege), "/api/finanzen": _nd(_nd_finanzen), "POST /api/aufnahme": _nd(_nd_aufnahme), "POST /api/finanzen/import": _nd(_nd_auszug),
                "/api/gesundheit": _nd(_nd_gesundheit), "/api/profil": _nd(_nd_profil), "/api/cospend": _nd(_nd_cospend), "/api/claude": _nd(_nd_ki),
                "POST /api/health-webhook": _nd_lieferung,
+               "POST /api/frage": _nd(_nd_frage), "/api/stand": _nd(_nd_stand),
                **{f"POST /api/{art}/entscheid": _nd(_nd_entscheid(art)) for art in ("finanzen", "training", "profil", "betrag")}}
 
 
@@ -263,7 +281,7 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         await self.helfer.start_server()
         self.server.append(self.helfer)
         self.tmp = tempfile.TemporaryDirectory()
-        einst = laden({"HOMIE_DATA": self.tmp.name, "HOMIE_DOCKER_URL": f"http://127.0.0.1:{docker}",
+        einst = laden({"HOMIE_DATA": self.tmp.name, "HOMIE_DOCKER_URL": f"http://127.0.0.1:{docker}", "HOMIE_GEDAECHTNIS_URL": f"http://127.0.0.1:{self.notizdienst}",
                        "HOMIE_YAMTRACK_SCHREIBEN": "1", "HOMIE_YAMTRACK_URL": f"http://127.0.0.1:{self.helfer.port}"})
         self.app = app_bauen(einst, erkundung_ziele=["127.0.0.1"], erkundung_ports=(ha, ollama, hinaus, 1))
         self.c = TestClient(TestServer(self.app))
@@ -463,6 +481,44 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         r = await self.c.post("/m/aufnahme/senden", data=ton, headers=kopf, allow_redirects=False)
         self.assertEqual(r.status, 303)
         self.assertEqual(len(ABGEGEBEN), 1)
+
+    async def test_gedaechtnis_fragen_und_notiz_tippen(self):
+        ABGEGEBEN.clear(); GEFRAGT.clear()
+        kopf = {"X-Homie-CSRF": self.csrf}
+        self.assertEqual((await self.c.post("/m/gedaechtnis/frage", json={"frage": "Wann kommt der Müll?"}, headers=kopf)).status, 404)   # Assistent noch nicht verbunden
+        await self.c.post("/dienst/neu", data={"csrf": self.csrf, "adresse": f"127.0.0.1:{self.notizdienst}"}, allow_redirects=False)
+        d = (await (await self.c.get("/api/dienste")).json())[0]
+        await self.c.post(f"/dienst/{d['id']}/verbinden", data={"csrf": self.csrf, "token": GUT}, allow_redirects=False)
+        self.assertIn("gedaechtnis", self.aktiv())
+        text = await (await self.c.get("/m/gedaechtnis")).text()
+        for erwartet in ('href="/m/gedaechtnis" aria-current="page"', "Kennt 7 Notizen · Profil · 5 Dokumente", "zuletzt eingelesen am 4.3. um 07:30 Uhr", 'id="frage"', 'id="notiz"', "/static/gedaechtnis.js"):
+            self.assertIn(erwartet, text)
+        self.assertNotIn(GUT, text)
+        skript = await (await self.c.get("/static/gedaechtnis.js")).text()
+        for erwartet in ("/m/gedaechtnis/frage", "/m/gedaechtnis/notiz", "X-Homie-CSRF", "verlassen dabei dein Heimnetz", "sessionStorage"):
+            self.assertIn(erwartet, skript)
+        self.assertNotIn("innerHTML", skript)
+        # Frage: nur mit Sicherheitsmarke; ohne ausdrücklichen Wunsch bleibt es bei „auto“
+        self.assertEqual((await self.c.post("/m/gedaechtnis/frage", json={"frage": "Wann kommt der Müll?"})).status, 403)
+        self.assertEqual((await self.c.post("/m/gedaechtnis/frage", json={"frage": "x"}, headers=kopf)).status, 400)
+        r = await self.c.post("/m/gedaechtnis/frage", json={"frage": "Wann kommt  der Müll?", "claude": "ja"}, headers=kopf)
+        j = await r.json()
+        self.assertEqual((r.status, j["antwort"], j["weg"], j["sicher"], j["sekunden"]), (200, "Am Dienstag.", "lokal", True, 3))
+        self.assertEqual(GEFRAGT[-1], {"frage": "Wann kommt der Müll?", "claude": "auto"})
+        self.assertEqual([(q["art"], q["datum"], q["link"]) for q in j["quellen"]],
+                         [("Notiz", "3.3.2026", ""), ("Dokument", "2.1.2026", "https://archiv.example/documents/7"), ("Dokument", "", "")])
+        j = await (await self.c.post("/m/gedaechtnis/frage", json={"frage": "Wann kommt der Müll?", "claude": True}, headers=kopf)).json()
+        self.assertEqual((j["weg"], GEFRAGT[-1]["claude"]), ("claude", "immer"))
+        # Getippte Notiz: geht als reiner Text an den Assistenten
+        notiz = "Heute Brot für 4,20 Euro gekauft."
+        self.assertEqual((await self.c.post("/m/gedaechtnis/notiz", data=notiz.encode(), headers={"Content-Type": "text/plain"})).status, 403)
+        self.assertEqual((await self.c.post("/m/gedaechtnis/notiz", data=b"{}", headers={**kopf, "Content-Type": "application/json"})).status, 415)
+        self.assertEqual((await self.c.post("/m/gedaechtnis/notiz", data=b"  ", headers={**kopf, "Content-Type": "text/plain"})).status, 400)
+        self.assertEqual((await self.c.post("/m/gedaechtnis/notiz", data=b"a" * 20001, headers={**kopf, "Content-Type": "text/plain"})).status, 413)
+        r = await self.c.post("/m/gedaechtnis/notiz", data=(notiz + "\n").encode(), headers={**kopf, "Content-Type": "text/plain; charset=utf-8"})
+        self.assertEqual((r.status, (await r.json())["ok"]), (200, True))
+        self.assertEqual(ABGEGEBEN, [("text/plain; charset=utf-8", len(notiz.encode()))])
+        self.assertEqual(gedaechtnis.adresse("http://192.0.2.5:8099"), "http://192.0.2.5:8097")
 
     async def test_uebernommenes_aus_dem_alten_dashboard(self):
         ENTSCHIEDEN.clear()

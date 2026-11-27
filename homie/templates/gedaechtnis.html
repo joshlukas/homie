@@ -1,0 +1,35 @@
+{% extends "basis.html" %}
+{% block titel %}Homie – Gedächtnis{% endblock %}
+{% block kopf %}<link rel="stylesheet" href="/static/gedaechtnis.css">
+<script src="/static/gedaechtnis.js" defer></script>{% endblock %}
+{% block koerper %}gedaechtnis{% endblock %}
+{% block inhalt %}
+<section class="kopf">
+  <h1>Gedächtnis</h1>
+  <p class="leiser">Frag, was du dir notiert, abgelegt oder über dich festgehalten hast. Die Antwort kommt von der KI in deinem Heimnetz und nennt ihre Fundstellen.</p>
+  {% if stand %}<p class="leiser klein stand">Kennt {{ stand.kennt | join(' · ') or 'noch nichts' }}{% if stand.zuletzt %} – zuletzt eingelesen {{ stand.zuletzt }}{% endif %}</p>
+  {% else %}<p class="meldung" role="alert">Das Gedächtnis ist gerade nicht erreichbar.</p>{% endif %}
+</section>
+
+<form id="frageform" class="glas fragefeld" data-csrf="{{ csrf }}" autocomplete="off">
+  <label for="frage">Deine Frage</label>
+  <div class="reihe">
+    <input id="frage" type="text" maxlength="2000" enterkeyhint="search" placeholder="z. B. Wann läuft mein Ausweis ab?" required>
+    <button id="fragen" type="submit">Fragen</button>
+  </div>
+  <p id="fragelage" class="lage" role="status"></p>
+</form>
+
+<div id="antworten" aria-live="polite"></div>
+<p id="leeren-zeile" hidden><button id="leeren" type="button" class="text">Verlauf auf diesem Gerät leeren</button></p>
+
+<h2 class="gruppe"><span>Notiz tippen</span></h2>
+<form id="notizform" class="glas fragefeld">
+  <label for="notiz">Statt zu sprechen</label>
+  <textarea id="notiz" rows="4" maxlength="20000" placeholder="z. B. Heute beim Bäcker ein Brot für 4,20 Euro gekauft."></textarea>
+  <div class="reihe unten">
+    <p id="notizlage" class="lage" role="status">Wird ausgewertet wie eine Sprachnotiz.</p>
+    <button id="notizsenden" type="submit">Notiz speichern</button>
+  </div>
+</form>
+{% endblock %}

@@ -193,9 +193,22 @@ async def nd_annehmen(request):
     return web.json_response({"ok": True, "name": "Aufnahme_demo", "konto": "Girokonto", "zeilen": 48, "neu": 12})
 
 
+async def nd_frage(request):
+    claude = (await request.json()).get("claude") == "immer"
+    return web.json_response({"antwort": "Der Personalausweis läuft am 14. August 2027 ab. Den Termin im Bürgeramt wolltest du im Frühjahr machen.", "gefunden": True, "sicher": True,
+                              "weg": "claude" if claude else "lokal", "hinweis": "", "sekunden": 6 if claude else 4, "quellen": [
+        {"nr": 1, "quelle": "paperless", "titel": "Personalausweis – Abholbestätigung", "datum": "2017-08-14", "link": "https://archiv.example/documents/12", "ausschnitt": "Gültig bis 14.08.2027. Bitte beantragen Sie rechtzeitig einen neuen Ausweis."},
+        {"nr": 2, "quelle": "notiz", "titel": "Notiz", "datum": tag(9), "link": None, "ausschnitt": "Ausweis läuft nächstes Jahr ab, im Frühjahr Termin im Bürgeramt machen."},
+        {"nr": 3, "quelle": "profil", "titel": "Profil", "datum": None, "link": None, "ausschnitt": "Erledigt Behördengänge gern früh am Morgen."}]})
+
+
+async def nd_stand(request):
+    return web.json_response({"quellen": {"notiz": {"eintraege": 64}, "paperless": {"eintraege": 38}, "profil": {"eintraege": 1}}, "zuletzt_eingelesen": zeit(0, 7, 30), "claude": {"frei": True}})
+
+
 NOTIZDIENST = [web.get("/api/eintraege", nd_eintraege), web.get("/api/finanzen", nd_finanzen), web.get("/api/cospend", nd_cospend), web.get("/api/claude", nd_ki),
                web.get("/api/profil", nd_profil), web.get("/api/gesundheit", nd_gesundheit), web.post("/api/aufnahme", nd_annehmen), web.post("/api/finanzen/import", nd_annehmen),
-               web.post("/api/{art}/entscheid", nd_annehmen)]
+               web.post("/api/{art}/entscheid", nd_annehmen), web.post("/api/frage", nd_frage), web.get("/api/stand", nd_stand)]
 
 
 # ---------- Home Assistant ----------
@@ -372,7 +385,7 @@ async def main():
     (daten / "seiten" / "blueprint.html").write_text(PLAN, encoding="utf-8")
     _yamtrack(daten / "yamtrack.sqlite3")
     nd, ha, pl = await _starten(NOTIZDIENST), await _starten(HOMEASSISTANT), await _starten(PAPERLESS)
-    app = server.app_bauen(laden({"HOMIE_DATA": str(daten), "HOMIE_DOCKER_LESEN": "0", "HOMIE_BIND": "127.0.0.1", "HOMIE_PORT": str(PORT), "HOMIE_YAMTRACK_DB": str(daten / "yamtrack.sqlite3"), "HOMIE_BILDER": str(_bilder(daten / "bilder"))}),
+    app = server.app_bauen(laden({"HOMIE_DATA": str(daten), "HOMIE_DOCKER_LESEN": "0", "HOMIE_BIND": "127.0.0.1", "HOMIE_PORT": str(PORT), "HOMIE_YAMTRACK_DB": str(daten / "yamtrack.sqlite3"), "HOMIE_BILDER": str(_bilder(daten / "bilder")), "HOMIE_GEDAECHTNIS_URL": f"http://127.0.0.1:{nd}"}),
                            erkundung_ziele=[])
     db, ablage = app[server.K_DB], app[server.K_ABLAGE]
     app[server.K_ANM].konto_anlegen(KENNWORT)
