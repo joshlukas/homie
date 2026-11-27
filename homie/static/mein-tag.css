@@ -538,3 +538,13 @@ details.rest p { margin: 6px 0 0; font-size: 14px; line-height: 1.5; white-space
 .gesehen .serien li{display:flex;gap:10px;align-items:center;padding:6px 0;border:0;min-width:0}
 .gesehen .serien img,.gesehen .serien li>i{width:34px;height:50px;object-fit:cover;border-radius:6px;background:var(--surface-strong,#111827);flex:none}
 .gesehen .serien div{display:flex;flex-direction:column;min-width:0}
+
+/* ---------- Schmale Bildschirme: nichts abschneiden, was sich umbrechen lässt ---------- */
+.trjkopf { flex-wrap: wrap; }
+@media (max-width: 560px) {
+  .ampel small { white-space: normal; overflow: visible; }
+  .trliste li { align-items: baseline; }
+  .trliste li span:not(.tag) { white-space: normal; overflow: visible; }
+  .gesehen .kacheln { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gesehen .kacheln.klein { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

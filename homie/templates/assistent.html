@@ -18,7 +18,7 @@
   <div class="glas kachel"><b>{{ 'an' if daten.nutzung.aktiv else 'aus' }}</b><span>Hilfe von außen</span></div>
 </div>
 <div class="glas tagkarte" style="margin-top: 12px">
-  <ul class="wochen">
+  <ul class="wochen datum">
     {% for t in daten.nutzung.tage %}<li><span>{{ t.name }}</span><div class="balken"><i style="width: {{ t.anteil }}%"></i></div><b>{{ t.wert }}</b></li>{% endfor %}
   </ul>
   {% if daten.nutzung.modelle %}<p class="leiser klein legende">Letzte 30 Tage: {% for m in daten.nutzung.modelle %}{{ m.name }} {{ m.betrag }} ({{ m.aufrufe }} Aufrufe){% if not loop.last %} · {% endif %}{% endfor %}</p>{% endif %}
@@ -30,7 +30,7 @@
 <h2 class="gruppe"><span>Vorschläge fürs Profil</span></h2>
 {% for v in daten.profil.vorschlaege %}
 <div class="glas tagkarte">
-  <h3>{{ v.abschnitt }} <span class="chip">{{ v.art }}</span></h3>
+  <h3>{{ v.abschnitt }} <span class="chip">{{ {"ergaenzen": "ergänzen", "aendern": "ändern", "loeschen": "löschen", "ersetzen": "ersetzen"}.get(v.art, v.art) }}</span></h3>
   {% if v.alt %}<p class="leiser klein alt">Bisher: {{ v.alt }}</p>{% endif %}
   <p>{{ v.neu }}</p>
   {% if v.grund %}<p class="leiser klein">Warum: {{ v.grund }}</p>{% endif %}

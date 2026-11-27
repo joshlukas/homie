@@ -319,6 +319,18 @@ async def blueprint_plan(request: web.Request) -> web.Response:
     return _seite(request, "blueprint_plan.html", marke=marke)
 
 
+# Der Plan rechnet mit einem eigenen festen Menü (58 px) über sich. Im Rahmen gibt es das nicht: Homies Menü steht außerhalb.
+# Deshalb hier – nach dem Stil der Datei und mit Vorrang – alles zurücknehmen, was Platz für dieses Menü lässt:
+# die Sprungleiste klebt ganz oben, reicht über die volle Breite und Abschnitte landen beim Anspringen frei darunter.
+PLAN_RAHMEN = """nav.menue { display: none !important; }
+body { padding-top: 0 !important; }
+.wrap { padding-top: 26px !important; }
+.nav { top: 0 !important; background: #14173a !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+  border-bottom: 0 !important; box-shadow: 0 0 0 100vmax #14173a, 0 1px 0 100vmax rgba(255, 255, 255, .13) !important; clip-path: inset(0 -100vmax -1px); scrollbar-width: none !important; }
+.nav::-webkit-scrollbar { display: none; }
+section, [id] { scroll-margin-top: 76px !important; }"""
+
+
 async def blueprint_plan_inhalt(request: web.Request) -> web.Response:
     """Der eigene, handgeschriebene Plan (seiten/blueprint.html) – als Standbild in Homies Rahmen.
 
@@ -337,7 +349,7 @@ async def blueprint_plan_inhalt(request: web.Request) -> web.Response:
     inhalt = re.sub(r"<link\b[^>]*(fonts\.googleapis|rel=\"icon\")[^>]*>", "", inhalt, flags=re.I)
     inhalt = re.sub(r"<a\b(?![^>]*\btarget=)([^>]*\bhref=\"https?://)", r'<a target="_blank" rel="noopener noreferrer"\1', inhalt, flags=re.I)
     schrift = (PAKET / "static" / "schrift" / "schrift.css").read_text(encoding="utf-8").replace('url("/static/', f'url("{hier}/static/')
-    zusatz = f"<style>{schrift}\nnav.menue {{ display: none !important; }} body {{ padding-top: 14px !important; }}</style>"
+    zusatz = f"<style>{schrift}\n{PLAN_RAHMEN}</style>"
     stelle = inhalt.lower().find("</head>")
     inhalt = inhalt[:stelle] + zusatz + inhalt[stelle:] if stelle >= 0 else zusatz + inhalt
     return web.Response(text=inhalt, content_type="text/html", headers={

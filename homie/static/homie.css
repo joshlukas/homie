@@ -274,10 +274,12 @@ a.dienst.weg { border-color: rgba(255, 107, 139, 0.55); }
 .ja-nein button { min-height: 36px; padding: 6px 14px; font-size: 13.5px; }
 .tagkarte .ja-nein.unten { margin-top: 12px; padding-bottom: 8px; }
 .buchungen li:has(.ja-nein) { align-items: center; flex-wrap: wrap; }
+.buchungen li:has(.ja-nein) > div { flex: 1 1 220px; }   /* schmal: Text über die ganze Breite, Knöpfe darunter */
 .saeulen { display: flex; align-items: flex-end; gap: 3px; height: 120px; margin: 10px 0 8px; }
 .saeulen i { flex: 1; min-height: 2px; border-radius: 4px 4px 0 0; background: linear-gradient(180deg, #a36bff, #6a5cff); }
 .saeulen i.montag { background: linear-gradient(180deg, #ff8a6b, #ff5fa2); }
 .wochen li.breit { grid-template-columns: minmax(90px, 1.2fr) 1fr 70px; }
+.wochen.datum li { grid-template-columns: 46px 1fr 64px; }   /* Tagesdatum statt Wochentag braucht mehr Platz */
 pre.profil { margin: 4px 0 10px; white-space: pre-wrap; overflow-wrap: anywhere; font: 14.5px/1.55 var(--schrift); color: var(--text); }
 .tagkarte p { overflow-wrap: anywhere; }
 .alt { text-decoration: line-through; }

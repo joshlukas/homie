@@ -619,6 +619,10 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(r.status, 200)
         for erwartet in ("Mein Plan", "Abschnitt", 'target="_blank" rel="noopener noreferrer" href="http://192.0.2.9:8080/"', "/static/schrift/outfit-latin.woff2"):
             self.assertIn(erwartet, inhalt)
+        # die Sprungleiste des Plans klebt im Rahmen ganz oben (ohne Platz für ein Menü) und Abschnitte landen frei darunter
+        for erwartet in (".nav { top: 0 !important", "scroll-margin-top: 76px !important", ".wrap { padding-top: 26px !important"):
+            self.assertIn(erwartet, inhalt)
+        self.assertLess(inhalt.index("</style>", inhalt.index(".nav { top: 0 !important")), inhalt.lower().index("</head>") + 1)   # steht im Kopf, nach dem Stil der Datei
         for weg in ("Altes Menü", "<script", "googleapis", "live.js"):                              # altes Menü, Skripte und Internet-Verweise sind entfernt
             self.assertNotIn(weg, inhalt)
         regel = r.headers["Content-Security-Policy"]
