@@ -523,3 +523,18 @@ details.rest p { margin: 6px 0 0; font-size: 14px; line-height: 1.5; white-space
   .feed li { grid-template-columns: minmax(0, 1fr); gap: 0; }
 }
 .erklaer{color:var(--muted);font-size:13.5px;line-height:1.5;margin:2px 0 12px}
+/* Gesehen: Kacheln für das zuletzt Geschaute, darunter der Stand der Serien in Spalten */
+.gesehen h3{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:16px 0 8px;font-weight:600}
+.gesehen ul{list-style:none;margin:0;padding:0}
+.gesehen .kacheln{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.gesehen .kacheln li{display:flex;flex-direction:column;gap:2px;min-width:0;border:0;padding:0}
+.gesehen .kacheln img,.gesehen .kacheln li>i{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:10px;background:var(--surface-strong,#111827);margin-bottom:6px}
+.gesehen .kacheln.klein{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
+.gesehen .kacheln.klein img,.gesehen .kacheln.klein li>i{aspect-ratio:2/3}
+.gesehen .kacheln b,.gesehen .serien b{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gesehen .kacheln span{font-size:13px}
+.gesehen small{color:var(--muted);font-size:12.5px}
+.gesehen .spalten{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:4px 24px}
+.gesehen .serien li{display:flex;gap:10px;align-items:center;padding:6px 0;border:0;min-width:0}
+.gesehen .serien img,.gesehen .serien li>i{width:34px;height:50px;object-fit:cover;border-radius:6px;background:var(--surface-strong,#111827);flex:none}
+.gesehen .serien div{display:flex;flex-direction:column;min-width:0}

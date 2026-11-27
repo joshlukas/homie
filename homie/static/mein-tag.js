@@ -141,12 +141,23 @@ function render(d) {
       `<h3 class="atag">${esc(tagName(t.tag))}</h3><ul class="feed">${t.e.map((e) => `<li style="--t:${artFarbe[e.typ]}"><em>${artName[e.typ]}</em><span>${esc(e.text)}${zusatz(e)}</span></li>`).join("")}</ul>`).join("")}</article>`);
   }
   const y = d.yamtrack, img = (b) => (b && /^https:\/\//.test(b) ? `<img src="${esc(b)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : "");
-  if (y && (y.laufend.length || y.folgen.length || y.filme.length)) {
-    notiertK.push(card("Gesehen", "var(--pink)", [
-      ...y.laufend.slice(0, 4).map((m) => ({z: "9", h: `<li class="media">${img(m.bild)}<div>${esc(m.titel)} <span class="tag">läuft</span></div></li>`})),
-      ...y.folgen.slice(0, 6).map((m) => ({z: m.zeit, h: `<li class="media">${img(m.bild)}<div>${esc(m.titel)} <span class="tag">S${m.staffel} · F${m.folge}</span><small>${fmtTime(m.zeit.replace(" ", "T") + "Z")}</small></div></li>`})),
-      ...y.filme.slice(0, 3).map((m) => ({z: m.zeit, h: `<li class="media">${img(m.bild)}<div>${esc(m.titel)} <span class="tag">Film</span><small>${fmtTime(m.zeit.replace(" ", "T") + "Z")}</small></div></li>`})),
-    ].sort((a, b) => b.z.localeCompare(a.z)).slice(0, 9).map((x) => x.h), {note: "aus Yamtrack"}));
+  if (y && (y.serien.length || y.zuletzt.length || y.filme.length)) {
+    // Zeiten aus Yamtrack sind Weltzeit ohne Kennung
+    const wann = (z) => (z ? fmtDay(new Date(z.replace(" ", "T") + "Z").toLocaleDateString("sv-SE")) : "");
+    const kachel = (m, zeile) => `<li>${img(m.bild) || "<i></i>"}<b>${esc(m.titel)}</b><span>${zeile}</span><small>${wann(m.zeit)}</small></li>`;
+    const stand = {
+      laeuft: (s) => (s.staffel ? `Staffel ${s.staffel} · ${s.folgen} ${s.folgen === 1 ? "Folge" : "Folgen"} gesehen` : "läuft"),
+      wartet: (s) => `Staffel ${s.staffel} vorgemerkt${s.staffeln_fertig ? " · " + s.staffeln_fertig + (s.staffeln_fertig === 1 ? " Staffel" : " Staffeln") + " gesehen" : ""}`,
+      pausiert: (s) => (s.staffel ? `pausiert bei Staffel ${s.staffel}${s.folgen ? " · " + s.folgen + (s.folgen === 1 ? " Folge" : " Folgen") + " gesehen" : ""}` : "pausiert")};
+    const spalte = (titel, art) => {
+      const L = y.serien.filter((s) => s.art === art);
+      return L.length ? `<div><h3>${titel}</h3><ul class="serien">${L.map((s) => `<li>${img(s.bild) || "<i></i>"}<div><b>${esc(s.titel)}</b><small>${stand[art](s)}${s.zuletzt && art !== "wartet" ? " · zuletzt " + wann(s.zuletzt) : ""}</small></div></li>`).join("")}</ul></div>` : "";
+    };
+    notiertK.push(`<article class="card wide gesehen" style="--c:var(--pink)"><h2><i></i>Gesehen<em>Stand aus Yamtrack</em></h2>
+      ${y.zuletzt.length ? `<h3>Zuletzt geschaut</h3><ul class="kacheln">${y.zuletzt.slice(0, 6).map((m) => kachel(m, `Staffel ${m.staffel} · Folge ${m.folge}`)).join("")}</ul>` : ""}
+      <div class="spalten">${spalte("Gerade dran", "laeuft")}${spalte("Wartet auf die nächste Staffel", "wartet")}${spalte("Pausiert", "pausiert")}</div>
+      ${y.filme.length ? `<h3>Filme</h3><ul class="kacheln klein">${y.filme.slice(0, 6).map((m) => kachel(m, m.wertung ? `Wertung ${String(m.wertung).replace(".", ",")} von 10` : "Film")).join("")}</ul>` : ""}
+    </article>`);
   }
   const aufnahmen = by("aufnahme");
   if (aufnahmen.length) notiertK.push(card("Aufnahmen im Wortlaut", "var(--faint)", aufnahmen.map((e) =>

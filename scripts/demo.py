@@ -335,17 +335,29 @@ async def _starten(wege, port=0):
 def _yamtrack(pfad: pathlib.Path):
     con = sqlite3.connect(pfad)
     con.executescript("""create table app_item (id integer primary key, title text, media_type text, image text, season_number integer, episode_number integer);
-        create table app_tv (id integer primary key, item_id integer, status text); create table app_episode (id integer primary key, item_id integer, end_date text);
+        create table app_tv (id integer primary key, item_id integer, status text); create table app_season (id integer primary key, item_id integer, status text, related_tv_id integer);
+        create table app_episode (id integer primary key, item_id integer, end_date text, related_season_id integer);
         create table app_movie (id integer primary key, item_id integer, end_date text, score real);""")
-    n = 0
-    for i, t in enumerate(("Nordlicht", "Die Werft", "Kanal 7")):
+    n = sid = eid = 0
+    # Serie, Stand der Serie, Staffeln als (Nummer, Stand, gesehene Folgen als (Folge, vor Tagen))
+    for tv, (t, stand, staffeln) in enumerate((
+            ("Nordlicht", "In progress", ((1, "In progress", ((4, 2), (5, 1), (6, 1))),)),
+            ("Die Werft", "In progress", ((1, "Completed", ((8, 40),)), (2, "In progress", ((2, 6), (3, 3))))),
+            ("Kanal 7", "In progress", ((1, "Completed", ((9, 5),)), (2, "Planning", ()))),
+            ("Hafenstadt", "Paused", ((1, "Paused", ((3, 60),)),))), 1):
         n += 1
         con.execute("insert into app_item values (?,?,?,?,?,?)", (n, t, "tv", "", None, None))
-        con.execute("insert into app_tv values (?,?,?)", (i + 1, n, "In progress"))
-    for i, (t, s, f, vor) in enumerate((("Nordlicht", 1, 6, 1), ("Nordlicht", 1, 5, 1), ("Die Werft", 2, 3, 3), ("Kanal 7", 1, 9, 5), ("Die Werft", 2, 2, 6))):
-        n += 1
-        con.execute("insert into app_item values (?,?,?,?,?,?)", (n, t, "episode", "", s, f))
-        con.execute("insert into app_episode values (?,?,?)", (i + 1, n, f"{tag(vor)} 19:{30 + i}:00"))
+        con.execute("insert into app_tv values (?,?,?)", (tv, n, stand))
+        for nr, st, folgen in staffeln:
+            n += 1
+            sid += 1
+            con.execute("insert into app_item values (?,?,?,?,?,?)", (n, t, "season", "", nr, None))
+            con.execute("insert into app_season values (?,?,?,?)", (sid, n, st, tv))
+            for f, vor in folgen:
+                n += 1
+                eid += 1
+                con.execute("insert into app_item values (?,?,?,?,?,?)", (n, t, "episode", "", nr, f))
+                con.execute("insert into app_episode values (?,?,?,?)", (eid, n, f"{tag(vor)} 19:{10 + f}:00", sid))
     for i, (t, vor) in enumerate((("Der lange Sommer", 4), ("Zwei Brücken", 12))):
         n += 1
         con.execute("insert into app_item values (?,?,?,?,?,?)", (n, t, "movie", "", None, None))

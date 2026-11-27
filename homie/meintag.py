@@ -112,18 +112,53 @@ async def _kalender(s, ha: _Quelle, tz, voraus: int = 14) -> dict | None:
 
 
 def _yamtrack(datei: str) -> dict:
+    """Liest, was Yamtrack selbst festhält – nichts wird gedeutet, was dort nicht steht.
+
+    Der Stand einer Serie kommt aus ihren Staffeln: „In progress“ an der Serie heißt in Yamtrack auch „nächste Staffel
+    vorgemerkt“ oder „Staffel pausiert“. Darum zählt die Staffel, an der man gerade ist.
+    """
     # immutable=1: Die Datenbank ist nur lesbar eingehängt; SQLite soll keine Hilfsdateien anlegen.
     con = sqlite3.connect(f"file:{datei}?mode=ro&immutable=1", uri=True, timeout=3)
     try:
-        laufend = [{"titel": t, "art": a, "bild": b} for t, a, b in con.execute(
-            "select i.title, i.media_type, i.image from app_tv t join app_item i on i.id = t.item_id where t.status = 'In progress' order by t.id desc")]
-        folgen = [{"titel": t, "staffel": s, "folge": f, "zeit": z, "bild": b} for t, s, f, z, b in con.execute(
-            "select i.title, i.season_number, i.episode_number, e.end_date, i.image from app_episode e join app_item i on i.id = e.item_id "
-            "where e.end_date is not null order by e.end_date desc limit 12")]
+        staffeln: dict[int, list] = {}
+        try:
+            for tv, nr, status, zahl, zuletzt in con.execute(
+                    "select s.related_tv_id, i.season_number, s.status, (select count(*) from app_episode e where e.related_season_id = s.id), "
+                    "(select max(e.end_date) from app_episode e where e.related_season_id = s.id) "
+                    "from app_season s join app_item i on i.id = s.item_id order by i.season_number"):
+                staffeln.setdefault(tv, []).append({"nr": nr, "status": status, "folgen": zahl, "zuletzt": zuletzt})
+        except sqlite3.OperationalError:    # ältere Yamtrack-Fassung ohne Staffel-Tabelle: dann nur der Stand der Serie
+            pass
+        serien = []
+        for tid, titel, bild, status in con.execute(
+                "select t.id, i.title, i.image, t.status from app_tv t join app_item i on i.id = t.item_id where t.status in ('In progress', 'Paused')"):
+            st = staffeln.get(tid, [])
+            wahl = lambda s: next((x for x in st if x["status"] == s), None)
+            dran, pause, geplant = wahl("In progress"), wahl("Paused"), wahl("Planning")
+            if status == "Paused" or (not dran and pause):
+                art, bei = "pausiert", pause or max((x for x in st if x["folgen"]), key=lambda x: x["nr"] or 0, default=None)
+            elif dran:
+                art, bei = "laeuft", dran
+            elif geplant:
+                art, bei = "wartet", geplant
+            else:
+                art, bei = "laeuft", None
+            zuletzt = max((x["zuletzt"] for x in st if x["zuletzt"]), default=None)
+            serien.append({"titel": titel, "bild": bild, "art": art, "staffel": bei and bei["nr"], "folgen": bei["folgen"] if bei else 0, "zuletzt": zuletzt,
+                           "staffeln_fertig": sum(1 for x in st if x["status"] == "Completed")})
+        serien.sort(key=lambda s: s["zuletzt"] or "", reverse=True)
+        zuletzt: dict[str, dict] = {}       # je Serie die jüngste gesehene Folge
+        for titel, staffel, folge, zeit, bild in con.execute(
+                "select i.title, i.season_number, i.episode_number, e.end_date, i.image from app_episode e join app_item i on i.id = e.item_id "
+                "where e.end_date is not null order by e.end_date desc, i.season_number desc, i.episode_number desc limit 400"):
+            if titel not in zuletzt:
+                if len(zuletzt) == 8:
+                    break
+                zuletzt[titel] = {"titel": titel, "staffel": staffel, "folge": folge, "zeit": zeit, "bild": bild}
         filme = [{"titel": t, "zeit": z, "bild": b, "wertung": w} for t, z, b, w in con.execute(
             "select i.title, m.end_date, i.image, m.score from app_movie m join app_item i on i.id = m.item_id "
             "where m.end_date is not null order by m.end_date desc limit 6")]
-        return {"laufend": laufend, "folgen": folgen, "filme": filme}
+        return {"serien": serien, "zuletzt": list(zuletzt.values()), "filme": filme}
     finally:
         con.close()
 
