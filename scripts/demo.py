@@ -160,8 +160,8 @@ async def nd_ki(request):
 
 async def nd_profil(request):
     return web.json_response({"profil": "## Alltag\nArbeitet meist von zu Hause.\nTrainiert drei Mal pro Woche.\n\n## Essen\nTrinkt morgens Kaffee, isst mittags warm.\n\n## Technik\nBetreibt einen kleinen Heimserver.",
-                              "vorschlaege": [{"id": 3, "erstellt": tag(1), "abschnitt": "Essen", "art": "ergaenzen", "alt": "", "neu": "Kauft am Samstag auf dem Wochenmarkt ein.",
-                                               "begruendung": "Kam in vier Notizen der letzten Wochen vor."}]})
+                              "vorschlaege": [{"id": 3, "erstellt": tag(1), "abschnitt": "Essen", "art": "ergaenzen", "alt": "", "neu": "Samstags Einkauf auf dem Wochenmarkt.",
+                                               "begruendung": "Du hast es in vier Notizen der letzten Wochen erwähnt."}]})
 
 
 def _trainings():

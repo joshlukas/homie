@@ -60,14 +60,16 @@ function render(d) {
   const ent = [], eur = (v) => v.toLocaleString("de-DE", {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " €", eur0 = (v) => nf(Math.round(v), 0) + " €";
   const P = d.profil, F = d.finanzen, g = d.gesundheit;
   if (P && P.vorschlaege && P.vorschlaege.length) {
-    const wort = {ergaenzen: "neu", ersetzen: "ändern", streichen: "streichen"};
+    // Was der Knopf bewirkt, steht bei jedem Vorschlag dabei – „Annehmen“ allein sagt es nicht.
+    const kopf = {ergaenzen: (a) => `Neuer Satz für „${a}“`, ersetzen: (a) => `Satz in „${a}“ ändern`, streichen: (a) => `Satz aus „${a}“ streichen`};
+    const ja = {ergaenzen: "Ins Profil aufnehmen", ersetzen: "So ändern", streichen: "Streichen"};
     ent.push(card("Über mich – Vorschläge", "var(--pink)", P.vorschlaege.map((v) =>
-      `<li><span class="tag">${esc(v.abschnitt)} · ${wort[v.art] || esc(v.art)}</span>
-        <div style="margin-top:6px">${v.art === "streichen" ? "<s>" + esc(v.alt) + "</s>" : esc(v.neu)}</div>
+      `<li><span class="tag">${esc((kopf[v.art] || kopf.ergaenzen)(v.abschnitt))}</span>
+        <div style="margin-top:6px">${v.art === "streichen" ? "<s>" + esc(v.alt) + "</s>" : "„" + esc(v.neu) + "“"}</div>
         ${v.art === "ersetzen" && v.alt ? `<div class="antwort">bisher: ${esc(v.alt)}</div>` : ""}
-        <small>${esc(v.begruendung)}</small>
-        <div class="knoepfe"><button data-profil="${v.id}" data-ja="1">Annehmen</button><button data-profil="${v.id}" data-ja="0">Ablehnen</button></div></li>`),
-      {note: "gilt erst, wenn du annimmst"}));
+        <small>Warum: ${esc(v.begruendung)}</small>
+        <div class="knoepfe"><button data-profil="${v.id}" data-ja="1">${ja[v.art] || ja.ergaenzen}</button><button data-profil="${v.id}" data-ja="0">Nicht übernehmen</button></div></li>`),
+      {note: "wartet auf dich", extra: `<p class="erklaer">Dein Notiz-Assistent führt ein kurzes Profil über dich und liest es bei jeder Sprachnotiz mit, damit er Namen, Begriffe und Gewohnheiten richtig versteht. Hier schlägt er Sätze dafür vor. Nimmst du einen an, steht er ab sofort im Profil. Lehnst du ab, verschwindet der Vorschlag und kommt nicht wieder.</p>`}));
   }
   const TV = (g && g.training_vorschlaege) || [];
   if (TV.length) ent.push(card("Training erkannt?", "var(--good)", TV.map((v) => `<li class="konto"><div><b>${fmtDay(v.tag)} · ${v.von} bis ${v.bis} Uhr</b><small>etwa ${v.dauer_min} Minuten · ${nf(v.schritte)} Schritte</small><div class="knoepfe"><button data-training="${esc(v.id)}" data-ja="1">Als Training eintragen</button><button data-training="${esc(v.id)}" data-ja="0">War keins</button></div></div></li>`),
