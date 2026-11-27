@@ -299,3 +299,6 @@ iframe.plan { flex: 1; min-height: 0; width: 100%; border: 0; background: var(--
 /* Hochladen auf der Finanzseite */
 .hochladen { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
 .hochladen + .meldung { margin-top: 12px; }
+
+.einmalig { margin: 10px 2px 0; overflow-wrap: anywhere; }
+.einmalig b { color: var(--text); font-weight: 600; }

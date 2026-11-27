@@ -38,6 +38,9 @@
   <div class="glas kachel"><b>{{ daten.budget.ausgegeben }}</b><span>ausgegeben von {{ daten.budget.spielraum }}</span></div>
   {% if daten.giro_ende %}<div class="glas kachel"><b>{{ daten.giro_ende }}</b><span>Girokonto am Monatsende (geschätzt)</span></div>{% endif %}
 </div>
+{% if daten.budget.einmalig %}
+<p class="leiser klein einmalig">Einmalig, nicht mitgezählt: <b>{{ daten.budget.einmalig.summe }}</b>{% for e in daten.budget.einmalig.posten %} · {% if daten.budget.einmalig.posten | length > 1 %}{{ e.betrag }} {% endif %}{{ e.grund or e.wer }}{% if e.grund and e.wer %} ({{ e.wer }}{% if e.tag %}, {{ e.tag }}{% endif %}){% elif e.tag %} ({{ e.tag }}){% endif %}{% endfor %}</p>
+{% endif %}
 {% endif %}
 
 <div class="spalten">

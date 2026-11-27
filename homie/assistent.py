@@ -63,6 +63,20 @@ def _euro(wert, stellen: int = 2) -> str:
     return "–" if not isinstance(wert, (int, float)) else deutsch(wert, stellen) + " €"
 
 
+def _einmalig(budget: dict) -> dict | None:
+    """Ausgaben, die der Nutzer als einmalig benannt hat: Sie sind aus „ausgegeben“ und „frei“ herausgerechnet
+    und werden nur genannt, damit die Zahlen nachvollziehbar bleiben. None, wenn es keine gibt."""
+    liste = budget.get("einmalig_liste")
+    posten = [e for e in liste if isinstance(e, dict) and isinstance(e.get("betrag"), (int, float))] if isinstance(liste, list) else []
+    if not posten:
+        return None
+    summe = budget.get("einmalig")
+    if not isinstance(summe, (int, float)):
+        summe = sum(abs(e["betrag"]) for e in posten)
+    return {"summe": _euro(abs(summe), 0), "posten": [{"betrag": _euro(abs(e["betrag"]), 0), "tag": _datum(e.get("tag") if isinstance(e.get("tag"), str) else "")[:-4],
+                                                      "wer": str(e.get("wer") or "")[:80], "grund": str(e.get("grund") or "")[:160]} for e in posten[:10]]}
+
+
 async def aufnahme_senden(basis: str, token: str, ton: bytes, art: str, zeit: str) -> str:
     """Gibt eine neue Aufnahme an den Assistenten ab. Antwort: Name, unter dem sie abgelegt wurde."""
     kopf = {"Authorization": f"Bearer {token}", "Content-Type": art or "audio/webm", "X-Aufnahme-Zeit": zeit}
@@ -120,6 +134,7 @@ async def finanzen(basis: str, token: str) -> dict:
             "frei": _euro(budget.get("frei"), 0), "je_tag": _euro(budget.get("je_tag"), 0), "rest_tage": budget.get("rest_tage"),
             "ausgegeben": _euro(budget.get("ausgegeben"), 0), "spielraum": _euro(budget.get("spielraum"), 0),
             "ampel": budget.get("ampel", ""), "minus": isinstance(budget.get("frei"), (int, float)) and budget["frei"] < 0,
+            "einmalig": _einmalig(budget),
         } if budget else None,
         "konten": [{"name": k.get("name", ""), "bank": k.get("bank", ""), "saldo": _euro(k.get("saldo")),
                     "minus": isinstance(k.get("saldo"), (int, float)) and k["saldo"] < 0, "stand": _datum(k.get("stand"))}

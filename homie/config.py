@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "0.19.2"
+VERSION = "0.19.3"
 PAKET = Path(__file__).resolve().parent
 
 

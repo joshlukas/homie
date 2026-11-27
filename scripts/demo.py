@@ -121,6 +121,7 @@ async def nd_finanzen(request):
         "seit": tag(300), "monat": _monat(0), "monate": {_monat(n): {"ein": 3120, "aus": -2700 - 90 * n} for n in range(5, -1, -1)},
         "budget": {"einnahmen": einnahmen, "fix": fix, "spielraum": raum, "ausgegeben": aus, "frei": round(raum - aus, 2), "je_tag": round((raum - aus) / max(1, tage - HEUTE.day), 2),
                    "rest_tage": tage - HEUTE.day, "ampel": "gruen", "karte_geschaetzt": None, "sonder": 180.0, "sonder_liste": [{"wer": "Steuererstattung", "betrag": 180.0}],
+                   "einmalig": 640.0, "einmalig_liste": [{"wer": "Möbelhaus", "betrag": -640.0, "tag": tag(4), "grund": "Schreibtisch"}],
                    "grundlage": ["Gehalt", "Miete", "Strom", "Versicherungen"]},
         "regel": [{"wer": "Gehalt", "betrag": 3120.0}, {"wer": "Miete", "betrag": -890.0}, {"wer": "Stadtwerke", "betrag": -95.0}],
         "karte": {"vorhanden": True, "monat": 412.8, "ueblich": 520.0, "kategorien": [

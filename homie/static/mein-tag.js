@@ -112,6 +112,15 @@ function render(d) {
 
   // ---------- Details, eingeklappt: nur was die Seiten Finanzen, Gesundheit und Assistent nicht schon zeigen ----------
   const geldK = [], koerperK = [], notiertK = [];
+  // Ausgaben, die als einmalig benannt wurden: schon herausgerechnet, hier nur genannt. Fehlt das Feld, steht nichts da.
+  const einmalig = (B) => {
+    const L = (Array.isArray(B.einmalig_liste) ? B.einmalig_liste : []).filter((e) => e && typeof e.betrag === "number");
+    if (!L.length) return "";
+    const summe = typeof B.einmalig === "number" ? Math.abs(B.einmalig) : L.reduce((s, e) => s + Math.abs(e.betrag), 0);
+    const posten = L.slice(0, 10).map((e) => { const neben = [e.wer, e.tag ? fmtDay(e.tag) : ""].filter(Boolean).join(", ");
+      return (L.length > 1 ? eur0(Math.abs(e.betrag)) + " " : "") + esc(e.grund || e.wer || "") + (e.grund && neben ? ` (${esc(neben)})` : !e.grund && e.tag ? ` (${esc(fmtDay(e.tag))})` : ""); });
+    return `<p class="einmalig">Einmalig, nicht mitgezählt: <b>${eur0(summe)}</b> · ${posten.join(" · ")}</p>`;
+  };
   teil("Monatsverlauf", geldK, () => {
   if (F && F.konten && F.konten.length) {
     const B = F.budget, V = F.verlauf, PR = F.prognose, ampel = {gruen: "var(--good)", gelb: "var(--warn)", rot: "var(--bad)"};
@@ -124,6 +133,7 @@ function render(d) {
         <div class="budget" role="img" aria-label="Vom Spielraum ${eur0(raum)} sind ${eur0(aus)} ausgegeben">
           <i class="b-aus${aus > raum ? " ueber" : ""}" style="flex:${Math.max(aus, 1)}"></i>${kommt > 0 ? `<i class="b-kommt" style="flex:${kommt}"></i>` : ""}${rest > 0 ? `<i class="b-rest" style="flex:${rest}"></i>` : ""}</div>
         <div class="budgetleg"><span><i class="b-aus"></i><b>${eur0(aus)}</b> ausgegeben</span>${PR ? `<span><i class="b-kommt"></i><b>etwa ${eur0(nochK)}</b> kommen erfahrungsgemäß noch</span>` : ""}<span><i class="b-rest"></i><b>${PR ? "etwa " : ""}${eur0(rest)}</b> bleiben übrig</span><span class="rechts">Spielraum im Monat: <b>${eur0(raum)}</b></span></div>
+        ${einmalig(B)}
         ${V ? `<div class="chart" id="verlauf"></div>
         <div class="legende"><span><i style="background:linear-gradient(90deg,#7c6cff,#ff5fa2)"></i>dieser Monat</span><span><i class="strich"></i>Prognose bis Monatsende</span><span><i class="punkte"></i>so lief es im Mittel der letzten Monate</span><span><i class="raum"></i>Spielraum</span></div>` : ""}
         <details><summary>So wird gerechnet</summary><p>Spielraum = regelmäßige Einnahmen ${eur(B.einnahmen)} − feste Ausgaben ${eur(B.fix)} = ${eur(raum)}. Davon ab geht, was diesen Monat mit Karte und vom Girokonto variabel ausgegeben wurde. Die Prognose nimmt an, dass der Rest des Monats so verläuft wie im Mittel der letzten Monate.</p></details></article>`);

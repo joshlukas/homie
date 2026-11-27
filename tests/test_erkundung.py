@@ -159,7 +159,8 @@ async def _nd_eintraege(request):
 async def _nd_finanzen(request):
     return web.json_response({
         "konten": [{"name": "Girokonto", "bank": "Testbank", "art": "giro", "saldo": 1234.5, "stand": "2026-03-04"}, {"name": "Karte", "bank": "Testbank", "art": "karte", "saldo": -87.1, "stand": "2026-03-03"}],
-        "budget": {"frei": 412.0, "je_tag": 31.7, "rest_tage": 13, "ausgegeben": 388.0, "spielraum": 800.0, "ampel": "gruen"},
+        "budget": {"frei": 412.0, "je_tag": 31.7, "rest_tage": 13, "ausgegeben": 388.0, "spielraum": 800.0, "ampel": "gruen",
+                   "einmalig": 1990.0, "einmalig_liste": [{"wer": "Alex", "betrag": -1990.0, "tag": "2026-11-24", "grund": "Notebook"}]},
         "bilanz": {"2026-02": {"ein": 2500, "aus": -2100, "netto": 400}, "2026-03": {"ein": 2500, "aus": -2750.4, "netto": -250.4}},
         "prognose": {"giro_ende": 950.0, "posten_alt": [], "posten": [{"wer": "Miete", "betrag": -700, "gebucht": 0, "offen": -700, "tag": 3}, {"wer": "Strom", "betrag": -60, "gebucht": -60, "offen": 0, "tag": 15}]},
         "abos": [{"wer": "Musikdienst", "je_monat": -10.99}],
@@ -477,7 +478,8 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         # Finanzen
         text = await (await self.c.get("/m/finanzen")).text()
         for erwartet in ("412 €", "noch 13 Tage", "ausgegeben von 800 €", "950 €", "Girokonto", "1.234,50 €", "-87,10 €", "Stand 4.3.2026",
-                         "Miete", "meist um den 3.", "Musikdienst", "10,99 € / Monat", "Supermarkt", "-23,45 €", "Mär", "-250 €", "ampel-gruen"):
+                         "Miete", "meist um den 3.", "Musikdienst", "10,99 € / Monat", "Supermarkt", "-23,45 €", "Mär", "-250 €", "ampel-gruen",
+                         "Einmalig, nicht mitgezählt: <b>1.990 €</b> · Notebook (Alex, 24.11.)"):
             self.assertIn(erwartet, text)
         self.assertNotIn("Strom", text)      # schon gebucht, also nicht mehr offen
         self.assertNotIn(GUT, text)

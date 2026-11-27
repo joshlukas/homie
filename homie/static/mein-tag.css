@@ -548,3 +548,6 @@ details.rest p { margin: 6px 0 0; font-size: 14px; line-height: 1.5; white-space
   .gesehen .kacheln { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .gesehen .kacheln.klein { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+.einmalig { margin: -8px 0 18px; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.einmalig b { color: var(--text); font-weight: 600; }
