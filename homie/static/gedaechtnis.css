@@ -3,7 +3,7 @@
 .gedaechtnis .stand { margin-top: 10px; }
 .fragefeld { padding: 18px; }
 .fragefeld label { margin-top: 0; }
-.fragefeld .reihe { display: flex; gap: 10px; align-items: center; }
+.fragefeld .reihe { display: flex; flex-wrap: nowrap; gap: 10px; align-items: center; margin: 0; }
 .fragefeld .reihe input { flex: 1; min-width: 0; }
 .fragefeld .reihe.unten { justify-content: space-between; margin-top: 12px; align-items: flex-start; }
 .fragefeld button { flex: none; }

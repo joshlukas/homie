@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import hashlib
 import hmac
 import ipaddress
 import json
@@ -33,6 +34,7 @@ KOPFZEILEN = {
     "Permissions-Policy": "geolocation=(), camera=(), microphone=(self)",
 }
 K_EINST = web.AppKey("einst", Einstellungen)
+K_STAND = web.AppKey("stand", str)
 K_DB = web.AppKey("db", Datenbank)
 K_ANM = web.AppKey("anmeldung", Anmeldung)
 K_ABLAGE = web.AppKey("ablage", Ablage)
@@ -72,7 +74,11 @@ async def kopfzeilen(request: web.Request, handler):
     if request.path.startswith("/static/schrift/"):
         # Der abgeschottete Plan lädt die Schriften „von außen“ (er hat keine eigene Herkunft); Schriften sind kein Geheimnis.
         antwort.headers["Access-Control-Allow-Origin"] = "*"
-    if not request.path.startswith("/static/") and "Cache-Control" not in antwort.headers:
+    if request.path.startswith("/static/"):
+        # Skripte und Gestaltung nie ungeprüft aus dem Zwischenspeicher: Sonst läuft nach einem Update eine alte Seite gegen neue Daten.
+        # Der Browser fragt kurz nach (ETag) und lädt nur, was sich geändert hat. Schriften ändern sich nicht.
+        antwort.headers["Cache-Control"] = "public, max-age=2592000" if request.path.startswith("/static/schrift/") and request.path.endswith(".woff2") else "no-cache"
+    elif "Cache-Control" not in antwort.headers:
         antwort.headers["Cache-Control"] = "no-store"
     if isinstance(antwort, web.HTTPException):
         raise antwort
@@ -171,7 +177,18 @@ def _seite(request: web.Request, vorlage: str, status: int = 200, **werte) -> we
         version=VERSION, pfad=request.path, menue=menue, csrf=sitzung.csrf if sitzung else "",
         eigene_seiten=[e for e in _eigene_seiten(app) if e["id"] != "blueprint"] if sitzung is not None else [], **werte
     )
+    # Jede Fassung der Skripte und der Gestaltung bekommt eine eigene Adresse – ein altes Stück im Browser passt dann nie zur neuen Seite.
+    html = re.sub(r'((?:src|href)="/static/[^"?]+\.(?:js|css))"', rf'\1?v={app[K_STAND]}"', html)
     return web.Response(text=html, content_type="text/html", status=status)
+
+
+def _static_stand() -> str:
+    """Kurzer Prüfwert über alle Skripte und Gestaltungsdateien: ändert sich, sobald sich eine davon ändert."""
+    h = hashlib.sha256()
+    for datei in sorted((PAKET / "static").rglob("*")):
+        if datei.suffix in (".js", ".css"):
+            h.update(datei.name.encode() + b"\0" + datei.read_bytes())
+    return h.hexdigest()[:10]
 
 
 def _cookie_setzen(request: web.Request, antwort: web.StreamResponse, wert: str) -> None:
@@ -1032,6 +1049,7 @@ def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, er
     app[K_ERK] = Erkundung(db, einst.docker_url, erkundung_ziele, erkundung_ports)
     app[K_LAUF] = lauf or {}
     app[K_BRIEFE] = {}
+    app[K_STAND] = _static_stand()
     app[K_MARKEN] = {}
     plaene.unterbrochene_markieren(db)
     app[K_JINJA] = jinja2.Environment(

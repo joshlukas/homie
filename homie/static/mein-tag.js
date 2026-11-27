@@ -22,9 +22,20 @@ function render(d) {
   const abIso = ab.toLocaleDateString("sv-SE"), E = (d.eintraege || []).filter((e) => (e.tag || "") >= abIso), by = (t) => E.filter((e) => e.typ === t);
   const stark = (s) => esc(s).replace(/\[\[(.+?)\]\]/g, "<b>$1</b>");
   const farbe = {kritisch: "var(--bad)", achtung: "var(--warn)", gut: "var(--good)", info: "var(--sky)", "": "var(--none)"};
-  const G = d.guide || {hinweise: [], agenda: [], ampeln: [], ruhig: [], kopf: ""};
+  const G = {hinweise: [], agenda: [], ampeln: [], ruhig: [], kopf: "", ...(d.guide || {})};
+  // Jeder Teil der Seite wird für sich gezeichnet: Fehlt einem Teil etwas, zeigt nur er einen Hinweis – der Rest bleibt stehen.
+  const panne = "Dieser Teil kann gerade nicht angezeigt werden. Der Rest der Seite ist davon nicht betroffen.";
+  const teil = (name, ziel, fn) => {
+    try { fn(); } catch (e) {
+      console.error("Mein Tag, Teil „" + name + "“:", e);
+      if (Array.isArray(ziel)) ziel.push(card(name, "var(--bad)", [], {empty: panne}));
+      else if (ziel) $(ziel).innerHTML = `<h2><i></i>${esc(name)}</h2><p class="empty">${panne}</p>`;
+      else $("#errors").insertAdjacentHTML("beforeend", `<p class="err">${esc(name)}: ${panne}</p>`);
+    }
+  };
 
   // ---------- Kopf: Datum, ein Satz zum Tag, je Bereich eine Ampel ----------
+  teil("Kopf", null, () => {
   $("#sub").textContent = new Date().toLocaleDateString("de-DE", {weekday: "long", day: "numeric", month: "long"});
   $("#gsatz").textContent = G.kopf || "Noch nichts verbunden, aus dem sich der Tag ablesen ließe.";
   $("#ampeln").innerHTML = G.ampeln.map((a) => `<a class="ampel" href="#${esc(a.ziel)}" data-ziel="${esc(a.ziel)}" style="--t:${farbe[a.ton] || farbe[""]}"><span><i></i>${esc(a.bereich)}</span><b>${esc(a.wert)}</b><small>${esc(a.text)}</small></a>`).join("");
@@ -33,17 +44,21 @@ function render(d) {
     bt.dataset.v = adr; bt.hidden = !adr; $("#guide").classList.toggle("mitbild", !!adr);
     if (adr) { const im = bt.querySelector("img"); im.onerror = () => { bt.hidden = true; $("#guide").classList.remove("mitbild"); }; im.src = adr; bt.href = adr; }
   }
+  });
 
   // ---------- Was heute zählt: Schlüsse statt Einzelwerte ----------
+  teil("Was heute zählt", "#hinweise", () => {
   const satz = (h) => `<li style="--t:${farbe[h.ton] || farbe.info}"${h.ziel ? ` data-ziel="${esc(h.ziel)}" tabindex="0" role="link"` : ""}><i></i><span><em>${esc(h.bereich)}</em>${stark(h.text)}</span></li>`;
   const oben = G.hinweise.slice(0, 7), mehr = G.hinweise.slice(7);
   $("#hinweise").innerHTML = `<h2><i></i>Was heute zählt</h2>` + (oben.length ? `<ul class="saetze">${oben.map(satz).join("")}</ul>` : `<p class="empty">Keine Auffälligkeiten.</p>`)
     + (mehr.length ? `<details class="rest"><summary>${mehr.length} weitere ${mehr.length === 1 ? "Hinweis" : "Hinweise"}</summary><ul class="saetze">${mehr.map(satz).join("")}</ul></details>` : "")
     + (G.ruhig.length ? `<p class="ruhig">Geprüft und unauffällig: ${esc(G.ruhig.join(", "))}.</p>` : "");
+  });
 
   // ---------- Agenda: Termine, Aufgaben, Erinnerungen und fällige Posten in einer Liste ----------
   const morgen = new Date(); morgen.setDate(morgen.getDate() + 1);
   const tagName = (iso) => !iso ? "Ohne festen Tag" : iso === t0 ? "Heute" : iso === morgen.toLocaleDateString("sv-SE") ? "Morgen" : new Date(iso + "T12:00").toLocaleDateString("de-DE", {weekday: "long", day: "numeric", month: "numeric"});
+  teil("Die nächsten Tage", "#agenda", () => {
   const punkt = {termin: "var(--sky)", aufgabe: "var(--accent)", vorschlag: "var(--warn)", erinnerung: "var(--pink)", posten: "var(--teal)"};
   const jeTag = [];
   G.agenda.forEach((a) => { const l = jeTag[jeTag.length - 1]; if (l && l.tag === a.tag) l.punkte.push(a); else jeTag.push({tag: a.tag, punkte: [a]}); });
@@ -55,10 +70,12 @@ function render(d) {
   const spaeter = hinten.reduce((s, g) => s + g.punkte.length, 0);
   $("#agenda").innerHTML = `<h2><i></i>Die nächsten Tage</h2>` + (jeTag.length ? vorn.map(aTag).join("") + (hinten.length ? `<details class="rest"><summary>${spaeter} weitere ${spaeter === 1 ? "Punkt" : "Punkte"}</summary>${hinten.map(aTag).join("")}</details>` : "")
     : `<p class="empty">Nichts in den nächsten sieben Tagen.</p>`);
+  });
 
   // ---------- Zu entscheiden: alles, was auf ein Ja oder Nein wartet ----------
   const ent = [], eur = (v) => v.toLocaleString("de-DE", {minimumFractionDigits: 2, maximumFractionDigits: 2}) + " €", eur0 = (v) => nf(Math.round(v), 0) + " €";
   const P = d.profil, F = d.finanzen, g = d.gesundheit;
+  teil("Über mich – Vorschläge", ent, () => {
   if (P && P.vorschlaege && P.vorschlaege.length) {
     // Was der Knopf bewirkt, steht bei jedem Vorschlag dabei – „Annehmen“ allein sagt es nicht.
     const kopf = {ergaenzen: (a) => `Neuer Satz für „${a}“`, ersetzen: (a) => `Satz in „${a}“ ändern`, streichen: (a) => `Satz aus „${a}“ streichen`};
@@ -71,23 +88,31 @@ function render(d) {
         <div class="knoepfe"><button data-profil="${v.id}" data-ja="1">${ja[v.art] || ja.ergaenzen}</button><button data-profil="${v.id}" data-ja="0">Nicht übernehmen</button></div></li>`),
       {note: "wartet auf dich", extra: `<p class="erklaer">Dein Notiz-Assistent führt ein kurzes Profil über dich und liest es bei jeder Sprachnotiz mit, damit er Namen, Begriffe und Gewohnheiten richtig versteht. Hier schlägt er Sätze dafür vor. Nimmst du einen an, steht er ab sofort im Profil. Lehnst du ab, verschwindet der Vorschlag und kommt nicht wieder.</p>`}));
   }
+  });
   // Betrag einer Sprachnotiz passt nicht zum bisherigen Preis: vermutlich verhört, also nachfragen statt buchen.
+  teil("Welcher Betrag stimmt?", ent, () => {
   const BF = (d.cospend && d.cospend.betrag_fragen) || [];
   if (BF.length) ent.push(card("Welcher Betrag stimmt?", "var(--warn)", BF.map((f) => `<li class="konto"><div><b>${esc(f.titel)}</b>
       <small>Notiz vom ${fmtDay(f.zeit.slice(0, 10))}: verstanden wurden ${eur(f.gesagt)}, bisher waren es ${eur(f.ueblich)}.</small>
       <div class="knoepfe"><button data-betrag="${f.id}" data-ja="1">${eur(f.ueblich)} eintragen</button><button data-betrag="${f.id}" data-ja="0">${eur(f.gesagt)} stimmt</button></div></div></li>`),
     {note: "noch nicht gebucht", extra: `<p class="erklaer">Der Betrag weicht stark von früheren Einträgen ab, vielleicht hat sich die Spracherkennung verhört. Gebucht wird erst der Betrag, den du hier wählst.</p>`}));
+  });
+  teil("Training erkannt?", ent, () => {
   const TV = (g && g.training_vorschlaege) || [];
   if (TV.length) ent.push(card("Training erkannt?", "var(--good)", TV.map((v) => `<li class="konto"><div><b>${fmtDay(v.tag)} · ${v.von} bis ${v.bis} Uhr</b><small>etwa ${v.dauer_min} Minuten · ${nf(v.schritte)} Schritte</small><div class="knoepfe"><button data-training="${esc(v.id)}" data-ja="1">Als Training eintragen</button><button data-training="${esc(v.id)}" data-ja="0">War keins</button></div></div></li>`),
     {note: "aus den Schritten des Bands"}));
+  });
+  teil("In die gemeinsame Abrechnung?", ent, () => {
   const O = F && F.cospend_offen;
   if (O && O.liste && O.liste.length) ent.push(card("In die gemeinsame Abrechnung?", "var(--teal)", O.liste.map((u) => `<li class="konto"><div><b>${esc(u.name)}</b><small>${fmtDay(u.tag)} · ${esc(u.wer)}</small><div class="knoepfe"><button data-finanz="${u.id}" data-ja="1">Eintragen</button><button data-finanz="${u.id}" data-ja="0">Übergehen</button></div></div><span class="betrag">${eur(u.betrag)}</span></li>`),
     {note: O.anzahl + " Kartenkäufe · " + eur(O.summe)}));
   else if (O && O.fehler) ent.push(card("In die gemeinsame Abrechnung?", "var(--teal)", [`<li>Abgleich nicht möglich<small>${esc(O.fehler)}</small></li>`]));
+  });
   $("#entscheiden").innerHTML = ent.length ? `<h3 class="gruppe"><span>Zu entscheiden</span></h3><div class="grid">${ent.join("")}</div>` : "";
 
   // ---------- Details, eingeklappt: nur was die Seiten Finanzen, Gesundheit und Assistent nicht schon zeigen ----------
   const geldK = [], koerperK = [], notiertK = [];
+  teil("Monatsverlauf", geldK, () => {
   if (F && F.konten && F.konten.length) {
     const B = F.budget, V = F.verlauf, PR = F.prognose, ampel = {gruen: "var(--good)", gelb: "var(--warn)", rot: "var(--bad)"};
     if (B) {
@@ -115,10 +140,13 @@ function render(d) {
         {note: "zusammen etwa " + nf(F.tipps.reduce((s, t) => s + t.ersparnis, 0), 0) + " € im Monat"}));
     }
   }
+  });
+  teil("Training", koerperK, () => {
   if (g) {
     window.__tr = {alle: g.training_alle || g.training || [], ab: g.daten_ab, stand: g.export_stand, monat: (window.__tr && window.__tr.monat) || null};
     if (window.__tr.alle.length) koerperK.push(`<article class="card wide trkarte" style="--c:var(--good)"><h2><i></i>Training${g.export_stand ? `<em>Export bis ${esc(fmtDay(g.export_stand))}</em>` : ""}</h2><div id="trkal"></div></article>`);
   }
+  });
   // Notiert: ein Verlauf statt einer Karte je Art
   const artName = {essen: "Essen", einkauf: "Einkauf", sport: "Sport", medien: "Medien", ueberlegung: "Gedanke", notiz: "Notiz", befinden: "Befinden", erinnerung: "Erinnerung", frage: "Frage", fuer_claude: "An Claude", aufgabe: "Aufgabe", termin: "Termin"};
   const artFarbe = {essen: "var(--lime)", einkauf: "var(--teal)", sport: "var(--good)", medien: "var(--pink)", ueberlegung: "var(--accent)", notiz: "var(--sky)", befinden: "var(--warn)", erinnerung: "var(--warn)", frage: "var(--teal)", fuer_claude: "var(--bad)", aufgabe: "var(--accent)", termin: "var(--sky)"};
@@ -133,6 +161,7 @@ function render(d) {
     const lang = x.antwort ? `<details class="rest"><summary>Antwort${x.modell ? " von " + esc(x.modell) : ""}</summary><p>${esc(x.antwort)}</p></details>` : "";
     const hinweis = [x.cospend ? "Cospend: " + x.cospend : "", x.yamtrack ? "Yamtrack: " + x.yamtrack : ""].filter(Boolean).map((s) => `<small>${esc(s)}</small>`).join("");
     return t.map((s) => `<span class="tag">${esc(s)}</span>`).join("") + hinweis + lang; };
+  teil("Notiert", notiertK, () => {
   if (feed.length) {
     const tage = [];
     feed.forEach((e) => { const l = tage[tage.length - 1]; if (l && l.tag === e.tag) l.e.push(e); else tage.push({tag: e.tag, e: [e]}); });
@@ -140,7 +169,9 @@ function render(d) {
     notiertK.push(`<article class="card wide" style="--c:var(--accent)"><h2><i></i>Notiert<em>${feed.length} Einträge${geld ? " · " + eur(geld) + " eingesprochene Ausgaben" : ""}</em></h2>${tage.map((t) =>
       `<h3 class="atag">${esc(tagName(t.tag))}</h3><ul class="feed">${t.e.map((e) => `<li style="--t:${artFarbe[e.typ]}"><em>${artName[e.typ]}</em><span>${esc(e.text)}${zusatz(e)}</span></li>`).join("")}</ul>`).join("")}</article>`);
   }
+  });
   const y = d.yamtrack, img = (b) => (b && /^https:\/\//.test(b) ? `<img src="${esc(b)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : "");
+  teil("Gesehen", notiertK, () => {
   if (y && (y.serien.length || y.zuletzt.length || y.filme.length)) {
     // Zeiten aus Yamtrack sind Weltzeit ohne Kennung
     const wann = (z) => (z ? fmtDay(new Date(z.replace(" ", "T") + "Z").toLocaleDateString("sv-SE")) : "");
@@ -159,10 +190,13 @@ function render(d) {
       ${y.filme.length ? `<h3>Filme</h3><ul class="kacheln klein">${y.filme.slice(0, 6).map((m) => kachel(m, m.wertung ? `Wertung ${String(m.wertung).replace(".", ",")} von 10` : "Film")).join("")}</ul>` : ""}
     </article>`);
   }
+  });
   const aufnahmen = by("aufnahme");
+  teil("Aufnahmen im Wortlaut", notiertK, () => {
   if (aufnahmen.length) notiertK.push(card("Aufnahmen im Wortlaut", "var(--faint)", aufnahmen.map((e) =>
     `<li>${esc(e.text)}<small>${fmtTime(e.zeit)} · ${e.daten.foto ? "Foto" : Math.floor((e.daten.sekunden || 0) / 60) + ":" + String((e.daten.sekunden || 0) % 60).padStart(2, "0") + " min"}${e.daten.privat ? " · privat" : ""}</small><details><summary>${e.daten.foto ? "Bildbeschreibung" : "Wortlaut"}</summary><p>${esc(e.daten.wortlaut)}</p></details></li>`),
     {wide: true}));
+  });
 
   const gruppen = [
     ["Geld", geldK, "Monatsverlauf · Kreditkarte · Sparpotenzial", `Konten, Buchungen, feste Posten und geteilte Ausgaben stehen auf der Seite <a href="/m/finanzen">Finanzen</a>, die KI-Kosten unter <a href="/m/assistent">Assistent</a>.`],
@@ -172,7 +206,7 @@ function render(d) {
   try { offen = JSON.parse(localStorage.getItem("meintag.offen") || "{}"); } catch (e) {}
   $("#grid").innerHTML = gruppen.map(([name, karten, kurz, verweis]) => !karten.length ? "" :
     `<details class="mehr" id="${name}"${offen[name] ? " open" : ""}><summary><span>${name}</span><em>${esc(kurz)}</em></summary><div class="grid">${karten.join("")}</div>${verweis ? `<p class="verweis">${verweis}</p>` : ""}</details>`).join("");
-  verlaufZeichnen(); trainingZeichnen();
+  teil("Grafiken", null, () => { verlaufZeichnen(); trainingZeichnen(); });
   document.querySelectorAll("details.mehr").forEach((x) => x.addEventListener("toggle", () => {
     offen[x.id] = x.open; try { localStorage.setItem("meintag.offen", JSON.stringify(offen)); } catch (e) {}
   }));
@@ -182,8 +216,10 @@ async function load() {
   document.querySelectorAll(".seg button").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.d) === days)));
   try {
     const r = await fetch("/api/tag?tage=" + days, {cache: "no-store"});
+    if (r.redirected || !(r.headers.get("Content-Type") || "").includes("json")) { location.reload(); return; }      // Anmeldung abgelaufen
     render(await r.json());
   } catch (e) {
+    console.error(e);
     $("#errors").innerHTML = `<p class="err">Daten konnten nicht geladen werden: ${esc(e.message)}</p>`;
   }
 }

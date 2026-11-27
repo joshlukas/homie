@@ -96,7 +96,7 @@ class Web(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.c.get("/static/menue.css")).status, 200)
         self.assertNotIn(".menue", await (await self.c.get("/static/homie.css")).text())
         # Schriften liefert Homie selbst aus – keine Anfrage ins Internet
-        self.assertIn('href="/static/schrift/schrift.css"', text)
+        self.assertIn('href="/static/schrift/schrift.css?v=', text)
         r = await self.c.get("/static/schrift/schrift.css")
         regeln = await r.text()
         self.assertEqual((r.status, regeln.count("@font-face"), "http" in regeln), (200, 4, False))

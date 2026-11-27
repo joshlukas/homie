@@ -455,6 +455,12 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         for erwartet in ('id="knopf"', 'id="zeit"', 'id="nachsenden"', "Sprachnotiz", "/static/aufnahme.js", "/static/aufnahme.css", "data-csrf=", 'href="/m/aufnahme" aria-current="page"'):
             self.assertIn(erwartet, text)
         self.assertNotIn(GUT, text)
+        # Skripte tragen ihre Fassung in der Adresse und werden nie ungeprüft aus dem Zwischenspeicher genommen
+        self.assertRegex(text, r'src="/static/aufnahme\.js\?v=[0-9a-f]{10}"')
+        self.assertRegex(text, r'href="/static/menue\.css\?v=[0-9a-f]{10}"')
+        self.assertEqual((await self.c.get("/static/aufnahme.js?v=abc")).headers["Cache-Control"], "no-cache")
+        tagskript = await (await self.c.get("/static/mein-tag.js")).text()
+        self.assertGreaterEqual(tagskript.count("  teil("), 12)      # jeder Teil von „Mein Tag“ fängt seine Fehler selbst
         skript = await (await self.c.get("/static/aufnahme.js")).text()
         for erwartet in ("/m/aufnahme/senden", "X-Homie-CSRF", "indexedDB", "wakeLock"):
             self.assertIn(erwartet, skript)
