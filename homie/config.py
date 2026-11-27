@@ -1,11 +1,12 @@
 """Einstellungen aus der Umgebung. Alles hat einen Standardwert – Homie startet ohne Vorkonfiguration."""
 from __future__ import annotations
 
+import ipaddress
 import os
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "0.19.3"
+VERSION = "0.19.4"
 PAKET = Path(__file__).resolve().parent
 
 
@@ -28,6 +29,7 @@ class Einstellungen:
     yamtrack_helfer: str = ""   # Adresse des Helfers, der Gesehenes in Yamtrack einträgt ("" = aus)
     gedaechtnis: str = ""       # Adresse des Gedächtnis-Dienstes ("" = derselbe Rechner wie der Notiz-Assistent, Port 8097)
     bilder: Path = Path("/bilder")   # Ordner für das „Bild des Tages“ (freiwillig; leer oder fehlend = kein Bild)
+    proxys: tuple = ()          # Netze des eigenen Reverse Proxys: nur deren X-Forwarded-For wird geglaubt (siehe _proxys)
 
     @property
     def seiten(self) -> Path:
@@ -37,6 +39,18 @@ class Einstellungen:
     @property
     def datenbank(self) -> Path:
         return self.daten / "homie.sqlite"
+
+
+def _proxys(wert: str) -> tuple:
+    """HOMIE_PROXY: Adressen oder Netze des Reverse Proxys, durch Kommas getrennt. Unlesbares wird übergangen,
+    damit ein Tippfehler Homie nicht am Start hindert (dann gilt die Bremse wie ohne Proxy für alle zugleich)."""
+    netze = []
+    for teil in wert.split(","):
+        try:
+            netze.append(ipaddress.ip_network(teil.strip(), strict=False))
+        except ValueError:
+            pass
+    return tuple(netze)
 
 
 def laden(umgebung: dict[str, str] | None = None) -> Einstellungen:
@@ -54,5 +68,6 @@ def laden(umgebung: dict[str, str] | None = None) -> Einstellungen:
         yamtrack=u.get("HOMIE_YAMTRACK_DB", "/yamtrack/db.sqlite3"),
         bilder=Path(u.get("HOMIE_BILDER", "/bilder")),
         gedaechtnis=u.get("HOMIE_GEDAECHTNIS_URL", "").strip().rstrip("/"),
+        proxys=_proxys(u.get("HOMIE_PROXY", "")),
         yamtrack_helfer=u.get("HOMIE_YAMTRACK_URL", "http://127.0.0.1:23751").strip().rstrip("/") if _an(u.get("HOMIE_YAMTRACK_SCHREIBEN"), False) else "",
     )

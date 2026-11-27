@@ -109,6 +109,11 @@ $("notizform").addEventListener("submit", async (e) => {
   e.preventDefault();
   const text = $("notiz").value.trim(), lage = $("notizlage"), knopf = $("notizsenden");
   if (text.length < 3) { lage.textContent = "Bitte erst etwas schreiben."; lage.className = "lage warn"; return; }
+  // Der Assistent nimmt höchstens 20.000 Bytes an; das Feld zählt Zeichen (ein Umlaut sind zwei Bytes).
+  if (new TextEncoder().encode(text).length > 20000) {
+    lage.textContent = "Die Notiz ist zu lang (höchstens etwa 20.000 Zeichen; Umlaute zählen doppelt). Bitte kürzen oder teilen.";
+    lage.className = "lage warn"; return;
+  }
   knopf.disabled = true; lage.textContent = "Sende …"; lage.className = "lage";
   try {
     await senden("/m/gedaechtnis/notiz", text, "text/plain; charset=utf-8");

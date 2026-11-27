@@ -164,6 +164,12 @@ def _yamtrack(datei: str) -> dict:
 
 
 async def schnappschuss(helfer_zugang, ha_zugang, tage: int = 7, ich: str = "", yamtrack_db: str = "") -> dict:
+    """Holt alles für „Mein Tag“ gleichzeitig und gibt es roh zurück (die Schlüsse zieht guide.py).
+
+    Felder: eintraege/kategorien (Notizen der letzten `tage`), gesundheit, kalender, finanzen, cospend, claude, profil,
+    yamtrack – jeweils None, wenn die Quelle fehlt oder ausfällt; fehler sammelt verständliche Gründe dafür.
+    Zugänge sind (Adresse, {"token": …}) oder None. Die Antwort wird 20 Sekunden lang wiederverwendet; wer etwas
+    ändert (Entscheidung, Lieferung), leert dafür _merker."""
     tage = max(1, min(int(tage), 400))
     marke = (tage, helfer_zugang and helfer_zugang[0], ha_zugang and ha_zugang[0], ich)
     alt = _merker.get(marke)

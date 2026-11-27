@@ -14,6 +14,12 @@ function card(title, color, rows, opts = {}) {
 }
 const row = (e, extra = "") => `<li>${esc(e.text)}${extra}${e.daten && e.daten.cospend ? `<div class="antwort">Cospend: ${esc(e.daten.cospend)}</div>` : ""}<small>${fmtTime(e.zeit)}</small></li>`;
 
+// Zeichnet die ganze Seite aus der Antwort von /api/tag (d). Die Kurznamen darin folgen der Antwort:
+//   G  = d.guide (Hinweise, Agenda, Ampeln aus homie/guide.py)   F  = d.finanzen     B  = F.budget (Monatsverlauf)
+//   KK = F.karte (Ausgaben nach Kategorie)                         O  = F.cospend_offen (was in die gemeinsame Abrechnung könnte)
+//   P  = d.profil (Vorschläge fürs Profil)                         BF = d.cospend.betrag_fragen (Betrag unklar)
+//   g  = d.gesundheit   TV = g.training_vorschlaege (erkannte Trainings)   y = d.yamtrack (Gesehenes)   L = jeweilige Liste
+// Alles, was vom Assistenten kommt, geht durch esc(), bevor es ins HTML kommt – auch Kennungen in data-Attributen.
 function render(d) {
   const t0 = today(), nf = (n, digits = 0) => n.toLocaleString("de-DE", {maximumFractionDigits: digits});
   $("#errors").innerHTML = (d.fehler || []).map((f) => `<p class="err">${esc(f)}</p>`).join("");
@@ -85,7 +91,7 @@ function render(d) {
         <div style="margin-top:6px">${v.art === "streichen" ? "<s>" + esc(v.alt) + "</s>" : "„" + esc(v.neu) + "“"}</div>
         ${v.art === "ersetzen" && v.alt ? `<div class="antwort">bisher: ${esc(v.alt)}</div>` : ""}
         <small>Warum: ${esc(v.begruendung)}</small>
-        <div class="knoepfe"><button data-profil="${v.id}" data-ja="1">${ja[v.art] || ja.ergaenzen}</button><button data-profil="${v.id}" data-ja="0">Nicht übernehmen</button></div></li>`),
+        <div class="knoepfe"><button data-profil="${esc(v.id)}" data-ja="1">${ja[v.art] || ja.ergaenzen}</button><button data-profil="${esc(v.id)}" data-ja="0">Nicht übernehmen</button></div></li>`),
       {note: "wartet auf dich", extra: `<p class="erklaer">Dein Notiz-Assistent führt ein kurzes Profil über dich und liest es bei jeder Sprachnotiz mit, damit er Namen, Begriffe und Gewohnheiten richtig versteht. Hier schlägt er Sätze dafür vor. Nimmst du einen an, steht er ab sofort im Profil. Lehnst du ab, verschwindet der Vorschlag und kommt nicht wieder.</p>`}));
   }
   });
@@ -94,17 +100,17 @@ function render(d) {
   const BF = (d.cospend && d.cospend.betrag_fragen) || [];
   if (BF.length) ent.push(card("Welcher Betrag stimmt?", "var(--warn)", BF.map((f) => `<li class="konto"><div><b>${esc(f.titel)}</b>
       <small>Notiz vom ${fmtDay(f.zeit.slice(0, 10))}: verstanden wurden ${eur(f.gesagt)}, bisher waren es ${eur(f.ueblich)}.</small>
-      <div class="knoepfe"><button data-betrag="${f.id}" data-ja="1">${eur(f.ueblich)} eintragen</button><button data-betrag="${f.id}" data-ja="0">${eur(f.gesagt)} stimmt</button></div></div></li>`),
+      <div class="knoepfe"><button data-betrag="${esc(f.id)}" data-ja="1">${eur(f.ueblich)} eintragen</button><button data-betrag="${esc(f.id)}" data-ja="0">${eur(f.gesagt)} stimmt</button></div></div></li>`),
     {note: "noch nicht gebucht", extra: `<p class="erklaer">Der Betrag weicht stark von früheren Einträgen ab, vielleicht hat sich die Spracherkennung verhört. Gebucht wird erst der Betrag, den du hier wählst.</p>`}));
   });
   teil("Training erkannt?", ent, () => {
   const TV = (g && g.training_vorschlaege) || [];
-  if (TV.length) ent.push(card("Training erkannt?", "var(--good)", TV.map((v) => `<li class="konto"><div><b>${fmtDay(v.tag)} · ${v.von} bis ${v.bis} Uhr</b><small>etwa ${v.dauer_min} Minuten · ${nf(v.schritte)} Schritte</small><div class="knoepfe"><button data-training="${esc(v.id)}" data-ja="1">Als Training eintragen</button><button data-training="${esc(v.id)}" data-ja="0">War keins</button></div></div></li>`),
+  if (TV.length) ent.push(card("Training erkannt?", "var(--good)", TV.map((v) => `<li class="konto"><div><b>${esc(fmtDay(v.tag))} · ${esc(v.von)} bis ${esc(v.bis)} Uhr</b><small>etwa ${esc(v.dauer_min)} Minuten · ${nf(v.schritte)} Schritte</small><div class="knoepfe"><button data-training="${esc(v.id)}" data-ja="1">Als Training eintragen</button><button data-training="${esc(v.id)}" data-ja="0">War keins</button></div></div></li>`),
     {note: "aus den Schritten des Bands"}));
   });
   teil("In die gemeinsame Abrechnung?", ent, () => {
   const O = F && F.cospend_offen;
-  if (O && O.liste && O.liste.length) ent.push(card("In die gemeinsame Abrechnung?", "var(--teal)", O.liste.map((u) => `<li class="konto"><div><b>${esc(u.name)}</b><small>${fmtDay(u.tag)} · ${esc(u.wer)}</small><div class="knoepfe"><button data-finanz="${u.id}" data-ja="1">Eintragen</button><button data-finanz="${u.id}" data-ja="0">Übergehen</button></div></div><span class="betrag">${eur(u.betrag)}</span></li>`),
+  if (O && O.liste && O.liste.length) ent.push(card("In die gemeinsame Abrechnung?", "var(--teal)", O.liste.map((u) => `<li class="konto"><div><b>${esc(u.name)}</b><small>${fmtDay(u.tag)} · ${esc(u.wer)}</small><div class="knoepfe"><button data-finanz="${esc(u.id)}" data-ja="1">Eintragen</button><button data-finanz="${esc(u.id)}" data-ja="0">Übergehen</button></div></div><span class="betrag">${eur(u.betrag)}</span></li>`),
     {note: O.anzahl + " Kartenkäufe · " + eur(O.summe)}));
   else if (O && O.fehler) ent.push(card("In die gemeinsame Abrechnung?", "var(--teal)", [`<li>Abgleich nicht möglich<small>${esc(O.fehler)}</small></li>`]));
   });

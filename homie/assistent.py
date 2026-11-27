@@ -1,9 +1,14 @@
-"""Module „Aufnahme“ und „Finanzen“: lesen einen Notiz-Assistenten – einen eigenen Dienst im Heimnetz,
-der Sprachnotizen mit lokaler KI verschriftlicht und einordnet und Kontoumsätze auswertet.
+"""Verbindung zum Notiz-Assistenten – einem eigenen Dienst im Heimnetz, der Sprachnotizen mit lokaler KI
+verschriftlicht und einordnet und Kontoumsätze auswertet. Genutzt von den Modulen Aufnahme, Finanzen, Gesundheit
+(langer Verlauf, Trainings) und Assistent (Profil, KI-Kosten).
 
-Gelesen wird über seine Schnittstelle (/api/eintraege, /api/finanzen). Die einzige Stelle, an der Homie
-etwas abgibt, ist eine neue Sprachaufnahme (/api/aufnahme) – nur wenn der Nutzer selbst aufnimmt.
-Homie speichert nichts davon.
+Lesen: /api/finanzen, /api/cospend, /api/gesundheit, /api/profil, /api/claude.
+Abgeben – immer nur auf eine Handlung des Nutzers hin:
+  - eine Aufnahme, ein Foto oder eine getippte Notiz (/api/aufnahme),
+  - einen Kontoauszug (/api/finanzen/import),
+  - sein Ja oder Nein zu einem Vorschlag (…/entscheid – das ändert Daten im Assistenten),
+  - die Lieferung der Gesundheits-App vom Handy, unverändert durchgereicht (/api/health-webhook).
+Homie speichert nichts davon. Die Funktionen bereiten die Antworten fertig für die Vorlagen auf (Beträge als Text).
 """
 from __future__ import annotations
 
@@ -39,6 +44,12 @@ async def _holen(basis: str, token: str, pfad: str) -> dict:
         raise AssistentFehler("Der Notiz-Assistent ist gerade nicht erreichbar.") from e
 
 
+def _objekt(antwort) -> dict:
+    """Antworten, die kein JSON-Objekt sind (null, Liste, Zahl), wie eine leere Antwort behandeln:
+    Dann greift die normale Fehlermeldung mit dem Status, statt dass Homie an antwort.get(...) scheitert."""
+    return antwort if isinstance(antwort, dict) else {}
+
+
 def _tag_text(tag: str, heute: dt.date) -> str:
     try:
         t = dt.date.fromisoformat(tag[:10])
@@ -63,6 +74,11 @@ def _euro(wert, stellen: int = 2) -> str:
     return "–" if not isinstance(wert, (int, float)) else deutsch(wert, stellen) + " €"
 
 
+def _betrag(wert) -> float | None:
+    """Betrag ohne Vorzeichen; None (wird als „–“ gezeigt), wenn keine Zahl ankommt."""
+    return abs(wert) if isinstance(wert, (int, float)) else None
+
+
 def _einmalig(budget: dict) -> dict | None:
     """Ausgaben, die der Nutzer als einmalig benannt hat: Sie sind aus „ausgegeben“ und „frei“ herausgerechnet
     und werden nur genannt, damit die Zahlen nachvollziehbar bleiben. None, wenn es keine gibt."""
@@ -83,7 +99,7 @@ async def aufnahme_senden(basis: str, token: str, ton: bytes, art: str, zeit: st
     try:
         async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False), timeout=aiohttp.ClientTimeout(total=150)) as s:
             async with s.post(basis.rstrip("/") + "/api/aufnahme", data=ton, headers=kopf, allow_redirects=False) as r:
-                antwort = await r.json(content_type=None)
+                antwort = _objekt(await r.json(content_type=None))
                 if r.status == 200 and antwort.get("ok"):
                     return str(antwort.get("name", ""))
                 if r.status == 413:
@@ -99,7 +115,7 @@ async def auszug_senden(basis: str, token: str, inhalt: bytes) -> dict:
         async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False), timeout=aiohttp.ClientTimeout(total=60)) as s:
             async with s.post(basis.rstrip("/") + "/api/finanzen/import", data=inhalt, allow_redirects=False,
                               headers={"Authorization": f"Bearer {token}", "Content-Type": "application/octet-stream"}) as r:
-                antwort = await r.json(content_type=None)
+                antwort = _objekt(await r.json(content_type=None))
                 if r.status == 200 and antwort.get("ok"):
                     return {"konto": str(antwort.get("konto", ""))[:80], "zeilen": int(antwort.get("zeilen") or 0), "neu": int(antwort.get("neu") or 0)}
                 if "Format" in str(antwort.get("fehler", "")):
@@ -110,21 +126,27 @@ async def auszug_senden(basis: str, token: str, inhalt: bytes) -> dict:
 
 
 async def finanzen(basis: str, token: str) -> dict:
+    """Alles für die Seite Finanzen: budget (Monatsverlauf, einmalige Ausgaben), konten, monate (letzte sechs mit
+    Balkenanteilen), offen (erwartete Abbuchungen), abos, letzte Umsätze, vorschlaege (für die gemeinsame Abrechnung)
+    und geteilt (siehe geteilt). Beträge kommen als fertiger Text („1.990 €“), „–“ wenn eine Zahl fehlt."""
     roh, teilen = await asyncio.gather(_holen(basis, token, "/api/finanzen"), geteilt(basis, token))
     offen = roh.get("cospend_offen") or {}
     budget, prognose = roh.get("budget") or {}, roh.get("prognose") or {}
     bilanz = roh.get("bilanz") or {}
-    hoch = max([max(abs(m.get("ein", 0)), abs(m.get("aus", 0))) for m in bilanz.values()] or [0]) or 1
+    # Ein Monat ohne Wert kommt als null an; m.get("ein", 0) gäbe dann None zurück, darum hier immer eine Zahl.
+    zahl = lambda w: w if isinstance(w, (int, float)) else 0
+    bilanz = {k: m for k, m in bilanz.items() if isinstance(m, dict)}
+    hoch = max([max(abs(zahl(m.get("ein"))), abs(zahl(m.get("aus")))) for m in bilanz.values()] or [0]) or 1
     monate = []
     for kennung in sorted(bilanz)[-6:]:
         m = bilanz[kennung]
+        ein, aus, netto = zahl(m.get("ein")), zahl(m.get("aus")), zahl(m.get("netto"))
         try:
             name = MONATE[int(kennung[5:7]) - 1]
         except (ValueError, IndexError):
             name = kennung
-        monate.append({"name": name, "ein": _euro(m.get("ein"), 0), "aus": _euro(abs(m.get("aus", 0)), 0), "netto": _euro(m.get("netto"), 0),
-                       "minus": (m.get("netto") or 0) < 0,
-                       "anteil_ein": int(100 * abs(m.get("ein", 0)) / hoch), "anteil_aus": int(100 * abs(m.get("aus", 0)) / hoch)})
+        monate.append({"name": name, "ein": _euro(m.get("ein"), 0), "aus": _euro(abs(aus), 0), "netto": _euro(m.get("netto"), 0),
+                       "minus": netto < 0, "anteil_ein": int(100 * abs(ein) / hoch), "anteil_aus": int(100 * abs(aus) / hoch)})
     return {
         "geteilt": teilen,
         "vorschlaege": [{"id": v.get("id", ""), "text": f"{_datum(v.get('tag'))[:-4]} {v.get('name') or v.get('wer', '')}", "betrag": _euro(v.get("betrag"))}
@@ -143,13 +165,13 @@ async def finanzen(basis: str, token: str) -> dict:
         "giro_ende": _euro(prognose.get("giro_ende"), 0) if prognose.get("giro_ende") is not None else "",
         "offen": [{"wer": p.get("wer", ""), "betrag": _euro(abs(p.get("offen", 0)), 0), "tag": p.get("tag")}
                   for p in prognose.get("posten", []) if p.get("offen")],
-        "abos": [{"wer": a.get("wer", ""), "betrag": _euro(abs(a.get("je_monat", 0)))} for a in roh.get("abos", [])],
+        "abos": [{"wer": a.get("wer", ""), "betrag": _euro(_betrag(a.get("je_monat")))} for a in roh.get("abos", [])],
         "letzte": [{"tag": _datum(u.get("tag"))[:-4], "wer": u.get("wer", ""), "zweck": u.get("zweck", ""), "konto": u.get("konto", ""),
                     "betrag": _euro(u.get("betrag")), "minus": (u.get("betrag") or 0) < 0} for u in roh.get("letzte", [])],
     }
 
 
-# ---------- Aus dem alten Dashboard übernommen: Verlauf, Trainings, geteilte Ausgaben, Profil, KI-Nutzung ----------
+# ---------- Gesundheitsverlauf und Trainings, geteilte Ausgaben, Profil, KI-Kosten ----------
 
 async def _versuchen(basis: str, token: str, pfad: str) -> dict | None:
     """Wie _holen, aber ein Teil, der gerade nicht geht, soll die Seite nicht mitreißen."""
@@ -160,6 +182,8 @@ async def _versuchen(basis: str, token: str, pfad: str) -> dict | None:
 
 
 async def gesundheit(basis: str, token: str, tage: int = 30) -> dict | None:
+    """Langer Verlauf für die Seite Gesundheit: tage (Schritte je Tag mit Balkenanteil), schnitt, training (letzte
+    Einheiten), vorschlaege (erkannte Trainings zum Bestätigen). None, wenn der Assistent nicht antwortet."""
     roh = await _versuchen(basis, token, f"/api/gesundheit?tage={tage}")
     if roh is None:
         return None
@@ -186,6 +210,8 @@ async def gesundheit(basis: str, token: str, tage: int = 30) -> dict | None:
 
 
 async def geteilt(basis: str, token: str) -> dict | None:
+    """Die gemeinsame Haushaltskasse (Cospend) der letzten 30 Tage: salden je Person, summe, arten (nach Kategorie)
+    und letzte Ausgaben. None, wenn der Assistent nicht antwortet."""
     roh = await _versuchen(basis, token, "/api/cospend?tage=30")
     if roh is None:
         return None
@@ -194,7 +220,7 @@ async def geteilt(basis: str, token: str) -> dict | None:
     hoch = max([b for _, b in arten] or [1]) or 1
     return {
         "projekt": roh.get("projekt", ""),
-        "salden": [{"wer": wer, "betrag": _euro(b), "minus": b < 0} for wer, b in (roh.get("saldo") or {}).items()],
+        "salden": [{"wer": wer, "betrag": _euro(b), "minus": isinstance(b, (int, float)) and b < 0} for wer, b in (roh.get("saldo") or {}).items()],
         "summe": _euro(zeitraum.get("summe"), 0), "anzahl": zeitraum.get("anzahl") or 0,
         "arten": [{"name": n, "betrag": _euro(b, 0), "anteil": int(100 * b / hoch)} for n, b in arten],
         "letzte": [{"tag": _datum(u.get("tag"))[:-4], "was": u.get("was", ""), "wer": u.get("zahler", ""), "art": u.get("kategorie", ""),
@@ -203,6 +229,8 @@ async def geteilt(basis: str, token: str) -> dict | None:
 
 
 async def profil_und_nutzung(basis: str, token: str) -> dict:
+    """Für Blueprint › Assistent: profil (Text und Änderungsvorschläge) und nutzung (KI-Kosten heute, je Tag, je Modell).
+    Fehlt einer der beiden Teile, ist er None; fehlen beide, gibt es eine Meldung."""
     profil, nutzung = await asyncio.gather(_versuchen(basis, token, "/api/profil"), _versuchen(basis, token, "/api/claude"))
     if profil is None and nutzung is None:
         raise AssistentFehler("Der Notiz-Assistent ist gerade nicht erreichbar.")
@@ -238,7 +266,7 @@ async def entscheid(basis: str, token: str, art: str, kennung: str, annehmen: bo
         async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False), timeout=aiohttp.ClientTimeout(total=40),
                                          headers={"Authorization": f"Bearer {token}"}) as s:
             async with s.post(basis.rstrip("/") + ENTSCHEID_WEGE[art], json=sende, allow_redirects=False) as r:
-                antwort = await r.json(content_type=None)
+                antwort = _objekt(await r.json(content_type=None))
                 if r.status == 200 and antwort.get("ok", True) is not False:
                     return True, "Übernommen." if annehmen else "Abgelehnt."
                 return False, str(antwort.get("fehler") or f"Fehler {r.status}")[:200]

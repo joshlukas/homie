@@ -54,7 +54,19 @@ def _ist_api(request: web.Request) -> bool:
 
 
 def _adresse(request: web.Request) -> str:
-    return request.remote or "?"
+    """Wer fragt – für die Bremse gegen Durchprobieren. Hinter dem eigenen Reverse Proxy kämen sonst alle Geräte
+    mit derselben Adresse (der des Proxys) an, und ein Gerät mit falschem Passwort sperrte alle anderen mit aus.
+    Darum gilt bei Aufrufen vom Proxy (HOMIE_PROXY) der letzte Eintrag in X-Forwarded-For: den hat der Proxy selbst
+    angehängt. Von allen anderen wird die Kopfzeile nicht geglaubt, sonst könnte jeder sich eine neue Adresse ausdenken."""
+    fern = request.remote or "?"
+    proxys = request.app[K_EINST].proxys
+    try:
+        if proxys and any(ipaddress.ip_address(fern) in netz for netz in proxys):
+            letzter = request.headers.get("X-Forwarded-For", "").split(",")[-1].strip()
+            return str(ipaddress.ip_address(letzter))
+    except ValueError:
+        pass
+    return fern
 
 
 def _https(request: web.Request) -> bool:
@@ -334,8 +346,9 @@ section, [id] { scroll-margin-top: 76px !important; }"""
 async def blueprint_plan_inhalt(request: web.Request) -> web.Response:
     """Der eigene, handgeschriebene Plan (seiten/blueprint.html) – als Standbild in Homies Rahmen.
 
-    Er läuft abgeschottet und ohne Skripte; sein eigenes Menüband und Verweise ins Internet werden entfernt,
-    die Schriften kommen von Homie. Verweise auf Dienste öffnen sich in einem neuen Tab."""
+    Er läuft abgeschottet und ohne Skripte. Entfernt werden: Skripte, sein eigenes Menüband, die Verweise auf
+    Google Fonts und sein Favicon – die Schriften kommen stattdessen von Homie. Verweise auf andere Seiten bleiben
+    und öffnen sich in einem neuen Tab; Bilder darf er von überall laden (img-src *), sonst nichts von außen."""
     datei = _plan_datei(request.app)
     if datei is None:
         raise web.HTTPNotFound()
@@ -764,7 +777,8 @@ async def gedaechtnis_notiz(request: web.Request) -> web.Response:
         return web.json_response({"fehler": "Erwartet wird reiner Text."}, status=415)
     inhalt = await _roh(request, gedaechtnis.MAX_NOTIZ)
     if inhalt is None:
-        return web.json_response({"fehler": "Die Notiz ist zu lang (höchstens 20.000 Zeichen)."}, status=413)
+        # Die Grenze des Assistenten zählt Bytes: ein Umlaut zählt doppelt, ein Emoji vierfach.
+        return web.json_response({"fehler": "Die Notiz ist zu lang (höchstens etwa 20.000 Zeichen; Umlaute zählen doppelt)."}, status=413)
     try:
         inhalt = inhalt.decode("utf-8").strip().encode("utf-8")
     except UnicodeDecodeError:
@@ -970,7 +984,14 @@ def _netzplan(app: web.Application) -> dict:
             "dienste": dienste.get(ip, []), "sonstiges": json.loads(z["sonstiges"]),
             "rolle": "Router" if ip == router else "Dieser Rechner" if ip in eigene else "",
         })
-    geraete.sort(key=lambda g: (g["rolle"] != "Router", g["rolle"] != "Dieser Rechner", not g["dienste"], int(ipaddress.IPv4Address(g["ip"]))))
+    def nach_adresse(ip: str) -> tuple:
+        """Adressen der Zahl nach (…2 vor …10); IPv4 vor IPv6, Unlesbares ans Ende statt die Seite abzubrechen."""
+        try:
+            a = ipaddress.ip_address(ip)
+            return a.version, int(a)
+        except ValueError:
+            return 99, 0
+    geraete.sort(key=lambda g: (g["rolle"] != "Router", g["rolle"] != "Dieser Rechner", not g["dienste"], nach_adresse(g["ip"])))
     container = [{**dict(z), "ports": json.loads(z["ports"])} for z in db.alle("SELECT name, image, zustand, ports, stack FROM container ORDER BY stack, name")]
     return {"geraete": geraete, "container": container, "stand": stand, "router": router}
 

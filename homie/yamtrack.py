@@ -16,9 +16,12 @@ import asyncio
 import datetime as dt
 import json
 import os
+import re
 
 import aiohttp
 from aiohttp import web
+
+from .tag import zone
 
 SOCKET = os.environ.get("HOMIE_DOCKER_SOCKET", "/var/run/docker.sock")
 CONTAINER = os.environ.get("HOMIE_YAMTRACK_CONTAINER", "yamtrack")
@@ -148,7 +151,7 @@ def pruefen(a) -> tuple[dict | None, str]:
             titel = str(a.get("titel", ""))[:120].strip()
             return ({"aktion": "kandidaten", "titel": titel}, "") if titel else (None, "kein Titel")
         if a.get("aktion") == "verbuchen":
-            if a.get("art") not in ("serie", "film") or not str(a.get("media_id", "")).isdigit() or len(str(a["media_id"])) > 12:
+            if a.get("art") not in ("serie", "film") or not re.fullmatch(r"[0-9]{1,12}", str(a.get("media_id", ""))):
                 return None, "art oder media_id fehlt"
             folgen = [[int(s), int(e)] for s, e in a.get("folgen") or []]
             if a["art"] == "serie" and not 0 < len(folgen) <= 12:
@@ -158,7 +161,10 @@ def pruefen(a) -> tuple[dict | None, str]:
             sauber = {"aktion": "verbuchen", "art": a["art"], "media_id": str(a["media_id"]), "folgen": folgen, "nochmal": bool(a.get("nochmal"))}
             if a.get("datum"):      # freiwillig: der Tag, an dem es gesehen wurde – nie in der Zukunft
                 tag = dt.date.fromisoformat(str(a["datum"]))
-                if not dt.date(2000, 1, 1) <= tag <= dt.date.today() or str(a["datum"]) != tag.isoformat():
+                # „Heute“ nach der Uhr der Installation, nicht nach der des Containers (dort gilt oft UTC):
+                # sonst wäre kurz nach Mitternacht der heutige Tag noch „in der Zukunft“.
+                heute = dt.datetime.now(zone()).date()
+                if not dt.date(2000, 1, 1) <= tag <= heute or str(a["datum"]) != tag.isoformat():
                     return None, "Datum außerhalb des Möglichen"
                 sauber["datum"] = tag.isoformat()
             return sauber, ""

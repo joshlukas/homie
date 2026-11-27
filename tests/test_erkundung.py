@@ -449,7 +449,7 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         r = await self.c.post(f"/dienst/{d['id']}/verbinden", data={"csrf": self.csrf, "token": GUT}, allow_redirects=False)
         self.assertEqual(r.status, 303)
         self.assertTrue({"aufnahme", "finanzen"} <= self.aktiv())
-        # Aufnahme: der große Knopf wie im alten Dashboard; was daraus wurde, steht in „Mein Tag“
+        # Aufnahme: der große Knopf; was daraus wurde, steht in „Mein Tag“
         r = await self.c.get("/m/aufnahme")
         text = await r.text()
         self.assertEqual(r.status, 200)

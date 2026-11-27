@@ -2,8 +2,9 @@
 
 Der Ordner wird nur gelesen (im Container nur lesbar eingehängt). Wie die Bilder hineinkommen, ist Homie gleich –
 zum Beispiel über die freiwillige Netzwerk-Freigabe aus docker-compose.yml. Jeden Tag ist ein anderes Bild dran,
-den ganzen Tag dasselbe; wiederholt wird erst, wenn alle an der Reihe waren. Ändert sich der Inhalt des Ordners,
-beginnt die Reihenfolge neu.
+den ganzen Tag dasselbe; wiederholt wird erst, wenn alle an der Reihe waren. Kommen Bilder dazu oder fallen weg
+(ändert sich also die Anzahl), wird neu gemischt. Wird nur ein Bild gegen ein anderes getauscht, bleibt die
+Reihenfolge, und das neue Bild kommt an die Stelle des alten.
 """
 from __future__ import annotations
 
@@ -36,6 +37,8 @@ def bilder(ordner: Path) -> list[Path]:
 
 
 def heute(ordner: Path, tag: dt.date) -> Path | None:
+    """Das Bild für diesen Tag. Die Tage zählen fortlaufend; je len(alle) Tage sind eine Runde, und jede Runde
+    hat ihre eigene, feste Mischung – so kommt in einer Runde jedes Bild genau einmal dran."""
     alle = bilder(ordner)
     if not alle:
         return None
