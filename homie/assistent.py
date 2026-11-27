@@ -210,14 +210,15 @@ async def profil_und_nutzung(basis: str, token: str) -> dict:
     return ergebnis
 
 
-ENTSCHEID_WEGE = {"finanzen": "/api/finanzen/entscheid", "training": "/api/training/entscheid", "profil": "/api/profil/entscheid"}
+ENTSCHEID_WEGE = {"finanzen": "/api/finanzen/entscheid", "training": "/api/training/entscheid", "profil": "/api/profil/entscheid",
+                  "betrag": "/api/betrag/entscheid"}
 
 
 async def entscheid(basis: str, token: str, art: str, kennung: str, annehmen: bool) -> tuple[bool, str]:
     """Gibt die Entscheidung des Nutzers zu einem Vorschlag an den Assistenten weiter. Das ändert dort Daten."""
     if art not in ENTSCHEID_WEGE:
         return False, "Diese Art von Vorschlag gibt es nicht."
-    sende = {"id": int(kennung) if art == "profil" and kennung.isdigit() else kennung, "annehmen": annehmen}
+    sende = {"id": int(kennung) if art in ("profil", "betrag") and kennung.isdigit() else kennung, "annehmen": annehmen}
     try:
         async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False), timeout=aiohttp.ClientTimeout(total=40),
                                          headers={"Authorization": f"Bearer {token}"}) as s:

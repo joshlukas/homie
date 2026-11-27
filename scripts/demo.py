@@ -145,7 +145,8 @@ async def nd_finanzen(request):
 async def nd_cospend(request):
     return web.json_response({"projekt": "Haushaltskasse", "seit": tag(6), "saldo": {"Alex": 37.6, "Sam": -37.6},
                               "zeitraum": {"summe": 163.7, "anzahl": 6, "nach_kategorie": {"Lebensmittel": 97.2, "Restaurant": 29.0, "Haushalt": 24.0, "Freizeit": 13.5}},
-                              "monat": {"monat": _monat(0), "summe": 486.3}, "monate": {_monat(n): 520 + 35 * (n % 4) for n in range(5, -1, -1)},
+                              "monat": {"monat": _monat(0), "summe": 486.3},
+                              "betrag_fragen": [{"id": 4, "zeit": tag(0) + "T08:10+01:00", "titel": "Nusshörnchen", "gesagt": 22.0, "ueblich": 2.2}], "monate": {_monat(n): 520 + 35 * (n % 4) for n in range(5, -1, -1)},
                               "letzte": [{"tag": tag(n), "was": w, "betrag": b, "zahler": z, "kategorie": k, "sprachnotiz": s} for n, w, b, z, k, s in (
                                   (0, "Bäcker", 4.3, "Alex", "Lebensmittel", True), (1, "Supermarkt", 62.4, "Alex", "Lebensmittel", True), (3, "Trattoria", 14.5, "Alex", "Restaurant", True),
                                   (4, "Kino", 13.5, "Sam", "Freizeit", False), (5, "Wochenmarkt", 30.5, "Sam", "Lebensmittel", False), (6, "Putzmittel", 24.0, "Alex", "Haushalt", False))]})

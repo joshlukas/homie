@@ -71,6 +71,12 @@ function render(d) {
         <div class="knoepfe"><button data-profil="${v.id}" data-ja="1">${ja[v.art] || ja.ergaenzen}</button><button data-profil="${v.id}" data-ja="0">Nicht übernehmen</button></div></li>`),
       {note: "wartet auf dich", extra: `<p class="erklaer">Dein Notiz-Assistent führt ein kurzes Profil über dich und liest es bei jeder Sprachnotiz mit, damit er Namen, Begriffe und Gewohnheiten richtig versteht. Hier schlägt er Sätze dafür vor. Nimmst du einen an, steht er ab sofort im Profil. Lehnst du ab, verschwindet der Vorschlag und kommt nicht wieder.</p>`}));
   }
+  // Betrag einer Sprachnotiz passt nicht zum bisherigen Preis: vermutlich verhört, also nachfragen statt buchen.
+  const BF = (d.cospend && d.cospend.betrag_fragen) || [];
+  if (BF.length) ent.push(card("Welcher Betrag stimmt?", "var(--warn)", BF.map((f) => `<li class="konto"><div><b>${esc(f.titel)}</b>
+      <small>Notiz vom ${fmtDay(f.zeit.slice(0, 10))}: verstanden wurden ${eur(f.gesagt)}, bisher waren es ${eur(f.ueblich)}.</small>
+      <div class="knoepfe"><button data-betrag="${f.id}" data-ja="1">${eur(f.ueblich)} eintragen</button><button data-betrag="${f.id}" data-ja="0">${eur(f.gesagt)} stimmt</button></div></div></li>`),
+    {note: "noch nicht gebucht", extra: `<p class="erklaer">Der Betrag weicht stark von früheren Einträgen ab, vielleicht hat sich die Spracherkennung verhört. Gebucht wird erst der Betrag, den du hier wählst.</p>`}));
   const TV = (g && g.training_vorschlaege) || [];
   if (TV.length) ent.push(card("Training erkannt?", "var(--good)", TV.map((v) => `<li class="konto"><div><b>${fmtDay(v.tag)} · ${v.von} bis ${v.bis} Uhr</b><small>etwa ${v.dauer_min} Minuten · ${nf(v.schritte)} Schritte</small><div class="knoepfe"><button data-training="${esc(v.id)}" data-ja="1">Als Training eintragen</button><button data-training="${esc(v.id)}" data-ja="0">War keins</button></div></div></li>`),
     {note: "aus den Schritten des Bands"}));
@@ -300,6 +306,19 @@ document.addEventListener("click", async (ev) => {
       if (!j.ok) throw new Error(j.fehler || "abgelehnt");
     } catch (e) {
       $("#errors").innerHTML = `<p class="err">Training konnte nicht verarbeitet werden: ${esc(e.message)}</p>`;
+    }
+    return load();
+  }
+  const bb = ev.target.closest("button[data-betrag]");
+  if (bb) {
+    bb.parentElement.querySelectorAll("button").forEach((x) => (x.disabled = true));
+    try {
+      const r = await fetch("/api/tag/entscheid/betrag", {method: "POST", headers: {"Content-Type": "application/json", "X-Homie-CSRF": document.body.dataset.csrf},
+        body: JSON.stringify({id: Number(bb.dataset.betrag), annehmen: bb.dataset.ja === "1"})});
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.fehler || "abgelehnt");
+    } catch (e) {
+      $("#errors").innerHTML = `<p class="err">Betrag konnte nicht gebucht werden: ${esc(e.message)}</p>`;
     }
     return load();
   }

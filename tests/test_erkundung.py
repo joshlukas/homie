@@ -237,7 +237,7 @@ def _nd_entscheid(art):
 NOTIZDIENST = {"/api/eintraege": _nd(_nd_eintraege), "/api/finanzen": _nd(_nd_finanzen), "POST /api/aufnahme": _nd(_nd_aufnahme), "POST /api/finanzen/import": _nd(_nd_auszug),
                "/api/gesundheit": _nd(_nd_gesundheit), "/api/profil": _nd(_nd_profil), "/api/cospend": _nd(_nd_cospend), "/api/claude": _nd(_nd_ki),
                "POST /api/health-webhook": _nd_lieferung,
-               **{f"POST /api/{art}/entscheid": _nd(_nd_entscheid(art)) for art in ("finanzen", "training", "profil")}}
+               **{f"POST /api/{art}/entscheid": _nd(_nd_entscheid(art)) for art in ("finanzen", "training", "profil", "betrag")}}
 
 
 async def _ping(request):
@@ -405,6 +405,9 @@ class Erkunden(unittest.IsolatedAsyncioTestCase):
         r = await self.c.post("/api/tag/entscheid/profil", json={"id": 7, "annehmen": False}, headers={"X-Homie-CSRF": self.csrf})
         self.assertEqual(await r.json(), {"ok": True})
         self.assertEqual(ENTSCHIEDEN, [("profil", {"id": 7, "annehmen": False})])
+        # Rückfrage zu einem auffälligen Betrag: die Nummer geht als Zahl weiter
+        r = await self.c.post("/api/tag/entscheid/betrag", json={"id": "4", "annehmen": True}, headers={"X-Homie-CSRF": self.csrf})
+        self.assertEqual((await r.json(), ENTSCHIEDEN[-1]), ({"ok": True}, ("betrag", {"id": 4, "annehmen": True})))
         # ein Dienst fällt aus → die Seite bekommt den Rest und eine Meldung statt eines Absturzes
         self.app[K_ABLAGE].setzen(module.schluesselname(ha, "token"), "abgelaufen")
         meintag._merker.clear()

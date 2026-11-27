@@ -198,6 +198,7 @@ class _Guide:
         n = offen.get("anzahl") or 0
         if n:
             self.entscheidungen += n
+        self.entscheidungen += len((c or {}).get("betrag_fragen") or [])
         if not c or not c.get("saldo"):
             return
         saldo = c["saldo"]

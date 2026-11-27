@@ -586,7 +586,7 @@ async def entscheid(request: web.Request) -> web.Response:
     daten = await request.post()
     art = request.match_info["art"]
     _, meldung = await assistent.entscheid(zugang[0], zugang[1]["token"], art, str(daten.get("id", ""))[:80], daten.get("annehmen") == "ja")
-    ziel = {"finanzen": "/m/finanzen", "training": "/m/gesundheit", "profil": "/blueprint/assistent"}[art]
+    ziel = {"finanzen": "/m/finanzen", "training": "/m/gesundheit", "profil": "/blueprint/assistent", "betrag": "/m/tag"}[art]
     raise web.HTTPSeeOther(str(URL(ziel).with_query(meldung=meldung)))
 
 
@@ -995,7 +995,7 @@ def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, er
         web.get("/blueprint/assistent", blueprint_assistent),
         *[web.get(weg + zusatz, frueher) for weg in FRUEHER for zusatz in ("", "/") if not weg.endswith(".html") or not zusatz],
         web.get("/s/{name}", eigene_seite),
-        web.post("/m/entscheid/{art:finanzen|training|profil}", entscheid),
+        web.post("/m/entscheid/{art:finanzen|training|profil|betrag}", entscheid),
         web.get("/m/{id}", modulseite),
         web.get("/api/zustand", api_zustand),
         web.get("/api/module", api_module),
@@ -1009,7 +1009,7 @@ def app_bauen(einst: Einstellungen, erkundung_ziele: list[str] | None = None, er
         web.get("/api/dokumente", api_dokumente),
         web.get("/api/dokumente/suche", api_dokumente_suche),
         web.get("/m/dokumente/pdf/{nr:\\d+}", dokument_datei),
-        web.post("/api/tag/entscheid/{art:finanzen|training|profil}", api_tag_entscheid),
+        web.post("/api/tag/entscheid/{art:finanzen|training|profil|betrag}", api_tag_entscheid),
         web.get("/api/netzplan", api_netzplan),
         web.post("/erkundung/start", erkundung_start),
         web.post("/dienst/neu", dienst_neu),
